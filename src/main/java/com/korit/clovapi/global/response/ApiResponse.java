@@ -2,6 +2,8 @@ package com.korit.clovapi.global.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import java.util.List;
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(
         boolean success,
@@ -14,6 +16,14 @@ public record ApiResponse<T>(
     }
 
     public static ApiResponse<Void> failure(String code, String message) {
-        return new ApiResponse<>(false, null, new ApiError(code, message));
+        return failure(code, message, null);
+    }
+
+    public static ApiResponse<Void> failure(
+            String code,
+            String message,
+            List<ApiErrorDetail> details
+    ) {
+        return new ApiResponse<>(false, null, new ApiError(code, message, details));
     }
 }
