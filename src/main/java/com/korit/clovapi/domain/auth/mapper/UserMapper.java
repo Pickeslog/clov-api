@@ -11,6 +11,13 @@ public interface UserMapper {
 
     Optional<User> findByEmail(@Param("email") String email);
 
+    Optional<User> findById(@Param("id") long id);
+
+    Optional<User> findByOauth(
+            @Param("oauthProvider") String oauthProvider,
+            @Param("oauthSubject") String oauthSubject
+    );
+
     boolean existsByPersonalInviteCode(@Param("personalInviteCode") String personalInviteCode);
 
     void insert(User user);

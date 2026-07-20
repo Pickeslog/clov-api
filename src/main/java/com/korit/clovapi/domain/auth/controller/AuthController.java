@@ -2,10 +2,14 @@ package com.korit.clovapi.domain.auth.controller;
 
 import com.korit.clovapi.domain.auth.dto.AuthResponse;
 import com.korit.clovapi.domain.auth.dto.LoginRequest;
+import com.korit.clovapi.domain.auth.dto.OAuthConsentRequest;
+import com.korit.clovapi.domain.auth.dto.OAuthExchangeRequest;
+import com.korit.clovapi.domain.auth.dto.OAuthExchangeResponse;
 import com.korit.clovapi.domain.auth.dto.RefreshTokenRequest;
 import com.korit.clovapi.domain.auth.dto.SignupRequest;
 import com.korit.clovapi.domain.auth.dto.TokenResponse;
 import com.korit.clovapi.domain.auth.service.AuthService;
+import com.korit.clovapi.domain.auth.service.OAuthAuthService;
 import com.korit.clovapi.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,9 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuthAuthService oauthAuthService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, OAuthAuthService oauthAuthService) {
         this.authService = authService;
+        this.oauthAuthService = oauthAuthService;
     }
 
     @PostMapping("/signup")
@@ -44,5 +50,15 @@ public class AuthController {
     public ApiResponse<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
         authService.logout(request);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/oauth/exchange")
+    public ApiResponse<OAuthExchangeResponse> exchange(@Valid @RequestBody OAuthExchangeRequest request) {
+        return ApiResponse.success(oauthAuthService.exchange(request.code()));
+    }
+
+    @PostMapping("/oauth/consent")
+    public ApiResponse<AuthResponse> consent(@Valid @RequestBody OAuthConsentRequest request) {
+        return ApiResponse.success(oauthAuthService.consent(request));
     }
 }

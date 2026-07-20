@@ -4,6 +4,9 @@ import com.korit.clovapi.global.security.filter.JwtAuthenticationFilter;
 import com.korit.clovapi.global.security.handler.JwtAccessDeniedHandler;
 import com.korit.clovapi.global.security.handler.JwtAuthenticationEntryPoint;
 import com.korit.clovapi.global.security.jwt.JwtProperties;
+import com.korit.clovapi.global.security.oauth2.CustomOAuth2UserService;
+import com.korit.clovapi.global.security.oauth2.OAuth2FailureHandler;
+import com.korit.clovapi.global.security.oauth2.OAuth2SuccessHandler;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +28,10 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
             JwtAuthenticationEntryPoint authenticationEntryPoint,
-            JwtAccessDeniedHandler accessDeniedHandler
+            JwtAccessDeniedHandler accessDeniedHandler,
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2SuccessHandler oauth2SuccessHandler,
+            OAuth2FailureHandler oauth2FailureHandler
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -38,6 +44,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/swagger-ui/**", "/v3/api-docs/**")
                         .permitAll()
                         .anyRequest().authenticated()
+                )
+                .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                        .successHandler(oauth2SuccessHandler)
+                        .failureHandler(oauth2FailureHandler)
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

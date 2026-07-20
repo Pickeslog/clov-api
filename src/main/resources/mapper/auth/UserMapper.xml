@@ -8,6 +8,8 @@
         <id property="id" column="id"/>
         <result property="email" column="email"/>
         <result property="password" column="password"/>
+        <result property="oauthProvider" column="oauth_provider"/>
+        <result property="oauthSubject" column="oauth_subject"/>
         <result property="nickname" column="nickname"/>
         <result property="profileImageUrl" column="profile_image_url"/>
         <result property="birthdate" column="birthdate"/>
@@ -18,10 +20,25 @@
     </resultMap>
 
     <select id="findByEmail" resultMap="userResultMap">
-        SELECT id, email, password, nickname, profile_image_url, birthdate,
+        SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
                terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
         FROM users
         WHERE email = #{email}
+    </select>
+
+    <select id="findById" resultMap="userResultMap">
+        SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByOauth" resultMap="userResultMap">
+        SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+        FROM users
+        WHERE oauth_provider = #{oauthProvider}
+          AND oauth_subject = #{oauthSubject}
     </select>
 
     <select id="existsByPersonalInviteCode" resultType="boolean">
@@ -34,10 +51,10 @@
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (
-            email, password, nickname, profile_image_url, birthdate,
+            email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
             terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
         ) VALUES (
-            #{email}, #{password}, #{nickname}, #{profileImageUrl}, #{birthdate},
+            #{email}, #{password}, #{oauthProvider}, #{oauthSubject}, #{nickname}, #{profileImageUrl}, #{birthdate},
             #{termsAgreedAt}, #{privacyAgreedAt}, #{marketingAgreedAt}, #{personalInviteCode}
         )
     </insert>

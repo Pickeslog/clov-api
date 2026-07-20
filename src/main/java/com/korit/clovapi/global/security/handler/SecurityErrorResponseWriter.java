@@ -10,15 +10,15 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
 @Component
-class SecurityErrorResponseWriter {
+public class SecurityErrorResponseWriter {
 
     private final ObjectMapper objectMapper;
 
-    SecurityErrorResponseWriter(ObjectMapper objectMapper) {
+    public SecurityErrorResponseWriter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+    public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
         response.setStatus(errorCode.httpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");

@@ -1,6 +1,7 @@
 package com.korit.clovapi.domain.auth.service;
 
 import com.korit.clovapi.domain.auth.dto.AuthResponse;
+import com.korit.clovapi.domain.auth.dto.AgreementsRequest;
 import com.korit.clovapi.domain.auth.dto.LoginRequest;
 import com.korit.clovapi.domain.auth.dto.RefreshTokenRequest;
 import com.korit.clovapi.domain.auth.dto.SignupRequest;
@@ -8,6 +9,7 @@ import com.korit.clovapi.domain.auth.dto.TokenResponse;
 import com.korit.clovapi.domain.auth.dto.UserResponse;
 import com.korit.clovapi.domain.auth.entity.User;
 import com.korit.clovapi.domain.auth.mapper.UserMapper;
+import com.korit.clovapi.domain.auth.oauth.OAuthProfile;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import com.korit.clovapi.global.security.jwt.JwtClaims;
@@ -73,8 +75,7 @@ public class AuthService {
         user.setPersonalInviteCode(nextPersonalInviteCode());
         userMapper.insert(user);
 
-        TokenResponse tokens = issueTokens(user.getId());
-        return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), UserResponse.from(user));
+        return authenticate(user);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -83,6 +84,31 @@ public class AuthService {
                 .filter(found -> passwordEncoder.matches(request.password(), found.getPassword()))
                 .orElseThrow(() -> new DomainException(ErrorCode.INVALID_CREDENTIALS));
 
+        return authenticate(user);
+    }
+
+    @Transactional
+    public AuthResponse signupOAuth(OAuthProfile profile, AgreementsRequest agreements) {
+        if (userMapper.findByEmail(profile.email()).isPresent()) {
+            throw new DomainException(ErrorCode.EMAIL_DUPLICATED);
+        }
+
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        User user = new User();
+        user.setEmail(profile.email());
+        user.setPassword(null);
+        user.setOauthProvider(profile.provider());
+        user.setOauthSubject(profile.subject());
+        user.setNickname(profile.nickname());
+        user.setTermsAgreedAt(now);
+        user.setPrivacyAgreedAt(now);
+        user.setMarketingAgreedAt(agreements.marketing() ? now : null);
+        user.setPersonalInviteCode(nextPersonalInviteCode());
+        userMapper.insert(user);
+        return authenticate(user);
+    }
+
+    public AuthResponse authenticate(User user) {
         TokenResponse tokens = issueTokens(user.getId());
         return new AuthResponse(tokens.accessToken(), tokens.refreshToken(), UserResponse.from(user));
     }
