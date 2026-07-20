@@ -13,8 +13,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Compile main + test sources
-        run: ./gradlew compileJava compileTestJava --no-daemon
-      # NOTE: 통합 테스트(@SpringBootTest)는 공유 DB(application-secret.yaml)가 필요해
-      # GitHub 러너에서 실행 불가. `./gradlew test`는 로컬에서 돌린다.
-      # 추후 Testcontainers(MySQL)로 CI 테스트 실행을 붙일 수 있음.
+      - name: Build and test
+        run: ./gradlew test --no-daemon
+      # 통합 테스트(@SpringBootTest)는 Testcontainers(MySQL)로 DB를 띄운다
+      # (ubuntu-latest 러너에 Docker 상주). schema.sql로 초기화 → 공유 DB 불필요.
+      # 순수 단위 테스트(JwtTokenProvider·GlobalResponseEnvelope)는 컨테이너 없이 실행.
