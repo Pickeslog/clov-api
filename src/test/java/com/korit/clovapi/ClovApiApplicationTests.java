@@ -1,10 +1,9 @@
 package com.korit.clovapi;
 
+import com.korit.clovapi.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class ClovApiApplicationTests {
+class ClovApiApplicationTests extends IntegrationTestSupport {
 
     @Test
     void contextLoads() {
