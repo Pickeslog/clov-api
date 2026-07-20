@@ -29,7 +29,9 @@ public enum ErrorCode {
     EMAIL_DUPLICATED("EMAIL_DUPLICATED", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
     TERMS_REQUIRED("TERMS_REQUIRED", HttpStatus.BAD_REQUEST, "필수 약관에 동의해주세요."),
     INVALID_TOKEN("INVALID_TOKEN", HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
-    TOKEN_EXPIRED("TOKEN_EXPIRED", HttpStatus.UNAUTHORIZED, "만료되었거나 무효화된 토큰입니다.");
+    TOKEN_EXPIRED("TOKEN_EXPIRED", HttpStatus.UNAUTHORIZED, "만료되었거나 무효화된 토큰입니다."),
+    OAUTH_CODE_INVALID("OAUTH_CODE_INVALID", HttpStatus.UNAUTHORIZED, "유효하지 않은 OAuth 코드입니다."),
+    OAUTH_EMAIL_REQUIRED("OAUTH_EMAIL_REQUIRED", HttpStatus.BAD_REQUEST, "소셜 계정 이메일이 필요합니다.");
 
     private final String code;
     private final HttpStatus httpStatus;
