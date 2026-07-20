@@ -1,3 +1,13 @@
 spring:
   application:
     name: clov-api
+  profiles:
+    include:
+      - secret
+
+mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
+  type-aliases-package: com.korit.clovapi.domain
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: "NULL"
