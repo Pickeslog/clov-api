@@ -23,7 +23,13 @@ public enum ErrorCode {
     STAGE_ALREADY_UPLOADED("STAGE_ALREADY_UPLOADED", HttpStatus.CONFLICT, "해당 단계의 사진이 이미 등록되었습니다."),
     STORAGE_QUOTA_EXCEEDED("STORAGE_QUOTA_EXCEEDED", HttpStatus.INSUFFICIENT_STORAGE, "저장 공간이 부족합니다."),
     MASCOT_INTERACTION_LIMIT_REACHED("MASCOT_INTERACTION_LIMIT_REACHED", HttpStatus.TOO_MANY_REQUESTS, "오늘의 마스코트 교감 횟수를 모두 사용했습니다."),
-    RATE_LIMITED("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS, "요청 횟수가 제한되었습니다.");
+    RATE_LIMITED("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS, "요청 횟수가 제한되었습니다."),
+
+    INVALID_CREDENTIALS("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "로그인 정보를 확인해주세요."),
+    EMAIL_DUPLICATED("EMAIL_DUPLICATED", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    TERMS_REQUIRED("TERMS_REQUIRED", HttpStatus.BAD_REQUEST, "필수 약관에 동의해주세요."),
+    INVALID_TOKEN("INVALID_TOKEN", HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+    TOKEN_EXPIRED("TOKEN_EXPIRED", HttpStatus.UNAUTHORIZED, "만료되었거나 무효화된 토큰입니다.");
 
     private final String code;
     private final HttpStatus httpStatus;

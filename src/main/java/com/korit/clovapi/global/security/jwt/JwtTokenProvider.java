@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
@@ -57,6 +58,7 @@ public class JwtTokenProvider {
                 .issuer(properties.issuer())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ttl)))
+                .id(UUID.randomUUID().toString())
                 .claim(TOKEN_TYPE_CLAIM, tokenType.name())
                 .signWith(signingKey)
                 .compact();

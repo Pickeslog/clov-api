@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.auth.mapper.UserMapper">
+
+    <resultMap id="userResultMap" type="com.korit.clovapi.domain.auth.entity.User">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="password" column="password"/>
+        <result property="nickname" column="nickname"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="birthdate" column="birthdate"/>
+        <result property="termsAgreedAt" column="terms_agreed_at"/>
+        <result property="privacyAgreedAt" column="privacy_agreed_at"/>
+        <result property="marketingAgreedAt" column="marketing_agreed_at"/>
+        <result property="personalInviteCode" column="personal_invite_code"/>
+    </resultMap>
+
+    <select id="findByEmail" resultMap="userResultMap">
+        SELECT id, email, password, nickname, profile_image_url, birthdate,
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+        FROM users
+        WHERE email = #{email}
+    </select>
+
+    <select id="existsByPersonalInviteCode" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM users
+            WHERE personal_invite_code = #{personalInviteCode}
+        )
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (
+            email, password, nickname, profile_image_url, birthdate,
+            terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+        ) VALUES (
+            #{email}, #{password}, #{nickname}, #{profileImageUrl}, #{birthdate},
+            #{termsAgreedAt}, #{privacyAgreedAt}, #{marketingAgreedAt}, #{personalInviteCode}
+        )
+    </insert>
+</mapper>
