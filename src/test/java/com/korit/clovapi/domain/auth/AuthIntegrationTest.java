@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,10 +76,12 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
 
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+                        .header("Origin", "http://localhost:5173")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"Abcd1234!\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
                 .andReturn();
 
         String loginRefreshToken = JsonPath.read(login.getResponse().getContentAsString(), "$.data.refreshToken");
