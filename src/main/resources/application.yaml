@@ -48,6 +48,14 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   oauth2:
     redirect-url: http://localhost:5173/oauth2/redirect
+  storage:
+    # 실제 값은 application-secret.yaml(로컬 전용)에서 주입한다. R2는 region=auto.
+    endpoint: ${APP_STORAGE_ENDPOINT:}
+    region: ${APP_STORAGE_REGION:auto}
+    bucket: ${APP_STORAGE_BUCKET:clov-media}
+    access-key: ${APP_STORAGE_ACCESS_KEY:}
+    secret-key: ${APP_STORAGE_SECRET_KEY:}
+    public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:}
 
 mybatis:
   mapper-locations: classpath:/mapper/**/*.xml

@@ -96,6 +96,22 @@ class PlanIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void presignReturnsSignedPutUrlForAvailableStage() throws Exception {
+        long planId = createPlan(tokenFor(userId), "Presign plan", "2026-07-22");
+
+        mockMvc.perform(post("/api/v1/plans/{planId}/stage-photos/presign", planId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stage\":\"PROPOSAL\",\"contentType\":\"image/jpeg\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.startsWith("https://")))
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.containsString("X-Amz-Signature")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.containsString("/plans/" + planId + "/proposal-")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.endsWith(".jpg")))
+                .andExpect(jsonPath("$.data.expiresIn").value(300));
+    }
+
+    @Test
     void stagesAreSequentialImmutableAndCompleteCreatesMemoryCandidate() throws Exception {
         long planId = createPlan(tokenFor(userId), "Stage plan", "2026-07-22");
 

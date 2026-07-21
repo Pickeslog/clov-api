@@ -11,6 +11,7 @@ import com.korit.clovapi.domain.plan.mapper.StagePhotoMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
+import com.korit.clovapi.global.storage.StoragePresigner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +21,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class PlanService {
@@ -31,13 +34,16 @@ public class PlanService {
     private final ChecklistMapper checklistMapper;
     private final StagePhotoMapper stagePhotoMapper;
     private final RoomMemberMapper roomMemberMapper;
+    private final StoragePresigner storagePresigner;
 
     public PlanService(PlanMapper planMapper, ChecklistMapper checklistMapper,
-                       StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper) {
+                       StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper,
+                       StoragePresigner storagePresigner) {
         this.planMapper = planMapper;
         this.checklistMapper = checklistMapper;
         this.stagePhotoMapper = stagePhotoMapper;
         this.roomMemberMapper = roomMemberMapper;
+        this.storagePresigner = storagePresigner;
     }
 
     @Transactional
@@ -152,7 +158,22 @@ public class PlanService {
         Plan plan = findPlan(planId);
         assertActiveMember(plan.getRoomId(), userId);
         assertStageAvailable(planId, request.stage());
-        return new PlanResponses.Presign("pending-storage-signature", "pending-storage-image-url", 300);
+        String objectKey = "rooms/%d/plans/%d/%s-%s%s".formatted(
+                plan.getRoomId(), planId,
+                request.stage().toLowerCase(Locale.ROOT), UUID.randomUUID(),
+                extensionFor(request.contentType()));
+        StoragePresigner.PresignResult result = storagePresigner.presignPut(objectKey, request.contentType());
+        return new PlanResponses.Presign(result.uploadUrl(), result.imageUrl(), result.expiresIn());
+    }
+
+    private static String extensionFor(String contentType) {
+        return switch (contentType == null ? "" : contentType.toLowerCase(Locale.ROOT)) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> ".bin";
+        };
     }
 
     @Transactional
