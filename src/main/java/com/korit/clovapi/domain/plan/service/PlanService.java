@@ -161,19 +161,9 @@ public class PlanService {
         String objectKey = "rooms/%d/plans/%d/%s-%s%s".formatted(
                 plan.getRoomId(), planId,
                 request.stage().toLowerCase(Locale.ROOT), UUID.randomUUID(),
-                extensionFor(request.contentType()));
+                StoragePresigner.extensionFor(request.contentType()));
         StoragePresigner.PresignResult result = storagePresigner.presignPut(objectKey, request.contentType());
         return new PlanResponses.Presign(result.uploadUrl(), result.imageUrl(), result.expiresIn());
-    }
-
-    private static String extensionFor(String contentType) {
-        return switch (contentType == null ? "" : contentType.toLowerCase(Locale.ROOT)) {
-            case "image/jpeg", "image/jpg" -> ".jpg";
-            case "image/png" -> ".png";
-            case "image/webp" -> ".webp";
-            case "image/gif" -> ".gif";
-            default -> ".bin";
-        };
     }
 
     @Transactional

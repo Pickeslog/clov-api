@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Locale;
 
 /**
  * 오브젝트 스토리지 업로드용 presigned PUT URL 발급 공용 유틸.
@@ -75,6 +76,17 @@ public class StoragePresigner implements AutoCloseable {
             return "";
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    /** MIME 타입 → object key 확장자. 미지원/누락은 {@code .bin}. */
+    public static String extensionFor(String contentType) {
+        return switch (contentType == null ? "" : contentType.toLowerCase(Locale.ROOT)) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> ".bin";
+        };
     }
 
     @Override

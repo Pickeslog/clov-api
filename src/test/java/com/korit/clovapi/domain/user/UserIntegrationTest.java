@@ -117,6 +117,27 @@ class UserIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void profileImagePresignReturnsSignedPutUrl() throws Exception {
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presign").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/png\",\"fileSize\":102400}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.startsWith("https://")))
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.containsString("X-Amz-Signature")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.containsString("users/" + userId + "/profile-")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")))
+                .andExpect(jsonPath("$.data.expiresIn").value(300));
+    }
+
+    @Test
+    void profileImagePresignRejectsMissingContentType() throws Exception {
+        mockMvc.perform(post("/api/v1/users/me/profile-image/presign").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fileSize\":102400}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void preferencesReturnDefaultsThenApplyPartialUpdate() throws Exception {
         mockMvc.perform(get("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer()))
                 .andExpect(status().isOk())
