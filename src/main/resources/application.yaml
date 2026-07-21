@@ -1,6 +1,9 @@
 spring:
   application:
     name: clov-api
+  datasource:
+    hikari:
+      connection-init-sql: SET time_zone = '+00:00'
   profiles:
     include:
       - secret
