@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -128,6 +129,21 @@ class InviteIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/join-requests/mine").header("Authorization", bearer(hostId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
+    void applicantCancelsOwnPendingRequest() throws Exception {
+        long requestId = insertPendingJoinRequest(roomId, applicantId);
+
+        // 남이 취소 시도 → NOT_FOUND(내 것 아님)
+        mockMvc.perform(delete("/api/v1/join-requests/{id}", requestId).header("Authorization", bearer(hostId)))
+                .andExpect(status().isNotFound());
+
+        // 본인 취소 → 200, 행 삭제
+        mockMvc.perform(delete("/api/v1/join-requests/{id}", requestId).header("Authorization", bearer(applicantId)))
+                .andExpect(status().isOk());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_join_requests WHERE id = ?", Integer.class, requestId));
     }
 
     @Test
