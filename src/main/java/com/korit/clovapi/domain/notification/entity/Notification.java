@@ -7,6 +7,8 @@ public class Notification {
     private Long roomId;
     private Long recipientId;
     private Long actorId;
+    private String actorNickname;
+    private String actorProfileImageUrl;
     private String type;
     private Long referenceId;
     private Boolean isRead;
@@ -23,6 +25,12 @@ public class Notification {
     
     public Long getActorId() { return actorId; }
     public void setActorId(Long actorId) { this.actorId = actorId; }
+    
+    public String getActorNickname() { return actorNickname; }
+    public void setActorNickname(String actorNickname) { this.actorNickname = actorNickname; }
+    
+    public String getActorProfileImageUrl() { return actorProfileImageUrl; }
+    public void setActorProfileImageUrl(String actorProfileImageUrl) { this.actorProfileImageUrl = actorProfileImageUrl; }
     
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
