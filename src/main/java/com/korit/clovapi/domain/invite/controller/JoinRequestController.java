@@ -6,6 +6,7 @@ import com.korit.clovapi.domain.invite.dto.MyJoinRequestsResponse;
 import com.korit.clovapi.domain.invite.service.InviteService;
 import com.korit.clovapi.global.response.ApiResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +31,12 @@ public class JoinRequestController {
     @GetMapping("/join-requests/mine")
     public ApiResponse<MyJoinRequestsResponse> findMine(Authentication authentication) {
         return ApiResponse.success(inviteService.findMyJoinRequests(currentUserId(authentication)));
+    }
+
+    @DeleteMapping("/join-requests/{joinRequestId}")
+    public ApiResponse<Void> cancel(Authentication authentication, @PathVariable long joinRequestId) {
+        inviteService.cancelMyJoinRequest(joinRequestId, currentUserId(authentication));
+        return ApiResponse.success(null);
     }
 
     @PostMapping("/join-requests/{joinRequestId}/accept")

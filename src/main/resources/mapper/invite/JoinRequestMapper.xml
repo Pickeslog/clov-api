@@ -67,6 +67,11 @@
           AND accepted_by = #{acceptedBy}
     </update>
 
+    <delete id="cancelPendingByIdAndUserId">
+        DELETE FROM room_join_requests
+        WHERE id = #{joinRequestId} AND user_id = #{userId} AND status = 'PENDING'
+    </delete>
+
     <select id="findMineByUserId" resultMap="roomJoinRequestResultMap">
         SELECT jr.id, jr.room_id, jr.user_id, jr.invite_id, jr.status, jr.accepted_by, jr.requested_at,
                jr.accepted_at, jr.undo_deadline_at, jr.rejected_at, jr.version,

@@ -112,6 +112,14 @@ public class InviteService {
                 .toList());
     }
 
+    /** 내 PENDING 신청 취소(요청 취소). 본인 것이 아니거나 이미 처리됐으면 NOT_FOUND. */
+    @Transactional
+    public void cancelMyJoinRequest(long joinRequestId, long userId) {
+        if (joinRequestMapper.cancelPendingByIdAndUserId(joinRequestId, userId) != 1) {
+            throw new DomainException(ErrorCode.NOT_FOUND);
+        }
+    }
+
     @Transactional
     public AcceptJoinRequestResponse acceptJoinRequest(long joinRequestId, long userId) {
         RoomJoinRequest request = findPending(joinRequestId);
