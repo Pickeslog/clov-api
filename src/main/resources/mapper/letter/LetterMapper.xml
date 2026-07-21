@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.letter.mapper.LetterMapper">
+
+    <resultMap id="letterResultMap" type="com.korit.clovapi.domain.letter.entity.LuckyLetter">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="receiverId" column="receiver_id"/>
+        <result property="content" column="content"/>
+        <result property="emoji" column="emoji"/>
+        <result property="readAt" column="read_at"/>
+        <result property="sentAt" column="sent_at"/>
+    </resultMap>
+
+    <resultMap id="letterDetailRowMap" type="com.korit.clovapi.domain.letter.dto.LetterDetailRow">
+        <id property="id" column="id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="senderNickname" column="sender_nickname"/>
+        <result property="senderProfileImageUrl" column="sender_profile_image_url"/>
+        <result property="receiverId" column="receiver_id"/>
+        <result property="receiverNickname" column="receiver_nickname"/>
+        <result property="receiverProfileImageUrl" column="receiver_profile_image_url"/>
+        <result property="content" column="content"/>
+        <result property="emoji" column="emoji"/>
+        <result property="readAt" column="read_at"/>
+        <result property="sentAt" column="sent_at"/>
+        <result property="favorite" column="is_favorite"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.korit.clovapi.domain.letter.entity.LuckyLetter"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, content, emoji, sent_at)
+        VALUES (#{roomId}, #{senderId}, #{receiverId}, #{content}, #{emoji}, #{sentAt})
+    </insert>
+
+    <insert id="insertBroadcast">
+        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, content, emoji, sent_at)
+        VALUES
+        <foreach collection="receiverIds" item="receiverId" separator=",">
+            (#{roomId}, #{senderId}, #{receiverId}, #{content}, #{emoji}, #{sentAt})
+        </foreach>
+    </insert>
+
+    <select id="findById" resultMap="letterResultMap">
+        SELECT id, room_id, sender_id, receiver_id, content, emoji, read_at, sent_at
+        FROM lucky_letters
+        WHERE id = #{id}
+    </select>
+
+    <select id="findBox" resultMap="letterDetailRowMap">
+        SELECT l.id, l.sender_id, sender.nickname AS sender_nickname, sender.profile_image_url AS sender_profile_image_url,
+               l.receiver_id, receiver.nickname AS receiver_nickname, receiver.profile_image_url AS receiver_profile_image_url,
+               l.content, l.emoji, l.read_at, l.sent_at,
+               EXISTS(
+                   SELECT 1 FROM letter_favorites f
+                   WHERE f.letter_id = l.id AND f.user_id = #{viewerId}
+               ) AS is_favorite
+        FROM lucky_letters l
+        JOIN users sender ON sender.id = l.sender_id
+        JOIN users receiver ON receiver.id = l.receiver_id
+        WHERE l.room_id = #{roomId}
+        <if test="box == 'received'">
+            AND l.receiver_id = #{viewerId}
+        </if>
+        <if test="box == 'sent'">
+            AND l.sender_id = #{viewerId}
+        </if>
+        ORDER BY l.sent_at DESC
+    </select>
+
+    <select id="findDetailById" resultMap="letterDetailRowMap">
+        SELECT l.id, l.sender_id, sender.nickname AS sender_nickname, sender.profile_image_url AS sender_profile_image_url,
+               l.receiver_id, receiver.nickname AS receiver_nickname, receiver.profile_image_url AS receiver_profile_image_url,
+               l.content, l.emoji, l.read_at, l.sent_at,
+               EXISTS(
+                   SELECT 1 FROM letter_favorites f
+                   WHERE f.letter_id = l.id AND f.user_id = #{viewerId}
+               ) AS is_favorite
+        FROM lucky_letters l
+        JOIN users sender ON sender.id = l.sender_id
+        JOIN users receiver ON receiver.id = l.receiver_id
+        WHERE l.id = #{id}
+    </select>
+
+    <update id="markRead">
+        UPDATE lucky_letters
+        SET read_at = #{readAt}
+        WHERE id = #{id}
+          AND read_at IS NULL
+    </update>
+
+    <select id="existsFavorite" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM letter_favorites
+            WHERE letter_id = #{letterId}
+              AND user_id = #{userId}
+        )
+    </select>
+
+    <insert id="insertFavorite">
+        INSERT INTO letter_favorites (letter_id, user_id)
+        VALUES (#{letterId}, #{userId})
+    </insert>
+
+    <delete id="deleteFavorite">
+        DELETE FROM letter_favorites
+        WHERE letter_id = #{letterId}
+          AND user_id = #{userId}
+    </delete>
+</mapper>
