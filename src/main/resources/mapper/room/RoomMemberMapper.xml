@@ -47,6 +47,14 @@
         SELECT COUNT(*) FROM room_members WHERE room_id = #{roomId} AND status = 'ACTIVE'
     </select>
 
+    <select id="countActiveForUpdateByRoomId" resultType="int">
+        SELECT COUNT(*) FROM room_members WHERE room_id = #{roomId} AND status = 'ACTIVE' FOR UPDATE
+    </select>
+
+    <delete id="deleteByRoomIdAndUserId">
+        DELETE FROM room_members WHERE room_id = #{roomId} AND user_id = #{userId}
+    </delete>
+
     <update id="updateStatusMessage">
         UPDATE room_members
         SET status_message = #{statusMessage}
