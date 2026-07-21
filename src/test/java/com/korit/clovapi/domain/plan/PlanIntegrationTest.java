@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +36,7 @@ class PlanIntegrationTest extends IntegrationTestSupport {
 
     private long userId;
     private long roomId;
+    private final List<Long> userIds = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -57,8 +59,9 @@ class PlanIntegrationTest extends IntegrationTestSupport {
         }
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
-        jdbcTemplate.update("DELETE FROM users WHERE id != ? AND email LIKE 'plan-it-%'", userId);
-        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+        for (Long createdUserId : userIds) {
+            jdbcTemplate.update("DELETE FROM users WHERE id = ?", createdUserId);
+        }
     }
 
     @Test
@@ -185,7 +188,9 @@ class PlanIntegrationTest extends IntegrationTestSupport {
                 nickname,
                 "CLV-" + suffix.substring(0, 8)
         );
-        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+        long createdUserId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+        userIds.add(createdUserId);
+        return createdUserId;
     }
 
     private long insertRoom() {
