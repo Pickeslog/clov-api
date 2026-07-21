@@ -1,1 +1,38 @@
-<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd"><mapper namespace="com.korit.clovapi.domain.plan.mapper.StagePhotoMapper"><resultMap id="s" type="com.korit.clovapi.domain.plan.entity.PlanStagePhoto"><id property="id" column="id"/><result property="planId" column="plan_id"/><result property="stage" column="stage"/><result property="imageUrl" column="image_url"/><result property="uploadedBy" column="uploaded_by"/><result property="nickname" column="nickname"/><result property="profileImageUrl" column="profile_image_url"/><result property="createdAt" column="created_at"/></resultMap><select id="findByPlanId" resultMap="s">SELECT s.id,s.plan_id,s.stage,s.image_url,s.uploaded_by,s.created_at,u.nickname,u.profile_image_url FROM plan_stage_photos s JOIN users u ON u.id=s.uploaded_by WHERE s.plan_id=#{planId}</select><select id="existsByPlanIdAndStage" resultType="boolean">SELECT EXISTS(SELECT 1 FROM plan_stage_photos WHERE plan_id=#{planId} AND stage=#{stage})</select><insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO plan_stage_photos(plan_id,stage,image_url,uploaded_by) VALUES(#{planId},#{stage},#{imageUrl},#{uploadedBy})</insert></mapper>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.plan.mapper.StagePhotoMapper">
+
+    <resultMap id="stagePhotoResultMap" type="com.korit.clovapi.domain.plan.entity.PlanStagePhoto">
+        <id property="id" column="id"/>
+        <result property="planId" column="plan_id"/>
+        <result property="stage" column="stage"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="uploadedBy" column="uploaded_by"/>
+        <result property="nickname" column="nickname"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findByPlanId" resultMap="stagePhotoResultMap">
+        SELECT s.id, s.plan_id, s.stage, s.image_url, s.uploaded_by, s.created_at,
+               u.nickname, u.profile_image_url
+        FROM plan_stage_photos s
+        JOIN users u ON u.id = s.uploaded_by
+        WHERE s.plan_id = #{planId}
+    </select>
+
+    <select id="existsByPlanIdAndStage" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM plan_stage_photos
+            WHERE plan_id = #{planId} AND stage = #{stage}
+        )
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO plan_stage_photos (plan_id, stage, image_url, uploaded_by)
+        VALUES (#{planId}, #{stage}, #{imageUrl}, #{uploadedBy})
+    </insert>
+</mapper>

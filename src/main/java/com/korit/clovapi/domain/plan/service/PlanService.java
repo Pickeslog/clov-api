@@ -1,20 +1,212 @@
 package com.korit.clovapi.domain.plan.service;
-import com.korit.clovapi.domain.plan.dto.*; import com.korit.clovapi.domain.plan.entity.*; import com.korit.clovapi.domain.plan.mapper.*; import com.korit.clovapi.domain.room.mapper.RoomMemberMapper; import com.korit.clovapi.global.exception.*; import org.springframework.stereotype.*; import org.springframework.transaction.annotation.*; import java.time.*; import java.util.*;
-@Service public class PlanService { private static final List<String> STAGES=List.of("PROPOSAL","SCHEDULING","CONFIRMED","MEETING"); private final PlanMapper plans; private final ChecklistMapper checklists; private final StagePhotoMapper photos; private final RoomMemberMapper members; public PlanService(PlanMapper p,ChecklistMapper c,StagePhotoMapper s,RoomMemberMapper m){plans=p;checklists=c;photos=s;members=m;}
- @Transactional public PlanResponses.Detail create(long room,long user,PlanRequests.Create r){member(room,user); Plan p=new Plan();p.setRoomId(room);p.setWriterId(user);p.setTitle(r.title());p.setPlanDate(r.planDate());p.setDescription(r.description());plans.insert(p);return detail(p.getId(),user);}
- public PlanResponses.Items<PlanResponses.Summary> list(long room,long user,String status,LocalDate from,LocalDate to){member(room,user);return new PlanResponses.Items<>(plans.findByRoomId(room,status,from,to).stream().map(PlanResponses.Summary::from).toList());}
- public PlanResponses.Detail detail(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);return PlanResponses.Detail.from(p,checklists.findByPlanId(id));}
- @Transactional public PlanResponses.Detail update(long id,long user,PlanRequests.Update r){Plan p=plan(id);member(p.getRoomId(),user);if(plans.updateByIdAndWriterId(id,user,r)!=1)throw new DomainException(ErrorCode.NOT_WRITER);return detail(id,user);}
- @Transactional public void delete(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);if(plans.deleteByIdAndWriterId(id,user)!=1)throw new DomainException(ErrorCode.NOT_WRITER);}
- @Transactional public PlanResponses.Detail complete(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);plans.complete(id,LocalDateTime.now(ZoneOffset.UTC));return detail(id,user);}
- @Transactional public PlanResponses.Detail cancel(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);if(plans.cancelByIdAndWriterId(id,user)!=1)throw new DomainException(ErrorCode.NOT_WRITER);return detail(id,user);}
- @Transactional public PlanResponses.Detail skip(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);plans.skipMemory(id);return detail(id,user);}
- @Transactional public PlanResponses.Checklist addChecklist(long id,long user,PlanRequests.Checklist r){Plan p=plan(id);member(p.getRoomId(),user);PlanChecklist c=new PlanChecklist();c.setPlanId(id);c.setContent(r.content());checklists.insert(c);return PlanResponses.Checklist.from(c);}
- @Transactional public PlanResponses.Checklist updateChecklist(long id,long user,PlanRequests.ChecklistUpdate r){PlanChecklist c=checklists.findById(id).orElseThrow(()->new DomainException(ErrorCode.NOT_FOUND));Plan p=plan(c.getPlanId());member(p.getRoomId(),user);checklists.update(id,r);return PlanResponses.Checklist.from(checklists.findById(id).orElseThrow());}
- @Transactional public void deleteChecklist(long id,long user){PlanChecklist c=checklists.findById(id).orElseThrow(()->new DomainException(ErrorCode.NOT_FOUND));member(plan(c.getPlanId()).getRoomId(),user);checklists.deleteById(id);}
- public PlanResponses.Items<PlanResponses.Stage> stages(long id,long user){Plan p=plan(id);member(p.getRoomId(),user);return new PlanResponses.Items<>(stageItems(id));}
- public PlanResponses.Presign presign(long id,long user,PlanRequests.Presign r){Plan p=plan(id);member(p.getRoomId(),user);assertStageAvailable(id,r.stage());return new PlanResponses.Presign("pending-storage-signature", "pending-storage-image-url",300);}
- @Transactional public PlanResponses.Stage commit(long id,long user,PlanRequests.Stage r){Plan p=plan(id);member(p.getRoomId(),user);assertStageAvailable(id,r.stage());if(photos.existsByPlanIdAndStage(id,r.stage()))throw new DomainException(ErrorCode.STAGE_ALREADY_UPLOADED);PlanStagePhoto photo=new PlanStagePhoto();photo.setPlanId(id);photo.setStage(r.stage());photo.setImageUrl(r.imageUrl());photo.setUploadedBy(user);photos.insert(photo);return stageItems(id).stream().filter(s->s.stage().equals(r.stage())).findFirst().orElseThrow();}
- private List<PlanResponses.Stage> stageItems(long id){Map<String,PlanStagePhoto> map=new HashMap<>();for(PlanStagePhoto p:photos.findByPlanId(id))map.put(p.getStage(),p);List<PlanResponses.Stage> out=new ArrayList<>();boolean previousDone=true;for(String s:STAGES){PlanStagePhoto p=map.get(s);String state=p!=null?"DONE":previousDone?"ACTIVE":"LOCKED";out.add(new PlanResponses.Stage(s,state,p==null?null:p.getImageUrl(),p==null?null:new PlanResponses.Writer(String.valueOf(p.getUploadedBy()),p.getNickname(),p.getProfileImageUrl()),p==null?null:p.getCreatedAt()));previousDone=p!=null;}return out;}
- private void assertStageAvailable(long id,String stage){int index=STAGES.indexOf(stage);if(index<0||index>0&&!photos.existsByPlanIdAndStage(id,STAGES.get(index-1)))throw new DomainException(ErrorCode.STAGE_LOCKED);}
- private Plan plan(long id){return plans.findById(id).orElseThrow(()->new DomainException(ErrorCode.NOT_FOUND));} private void member(long room,long user){if(members.findActiveByRoomIdAndUserId(room,user).isEmpty())throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);} }
+
+import com.korit.clovapi.domain.plan.dto.PlanRequests;
+import com.korit.clovapi.domain.plan.dto.PlanResponses;
+import com.korit.clovapi.domain.plan.entity.Plan;
+import com.korit.clovapi.domain.plan.entity.PlanChecklist;
+import com.korit.clovapi.domain.plan.entity.PlanStagePhoto;
+import com.korit.clovapi.domain.plan.mapper.ChecklistMapper;
+import com.korit.clovapi.domain.plan.mapper.PlanMapper;
+import com.korit.clovapi.domain.plan.mapper.StagePhotoMapper;
+import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
+import com.korit.clovapi.global.exception.DomainException;
+import com.korit.clovapi.global.exception.ErrorCode;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class PlanService {
+
+    private static final List<String> STAGES = List.of("PROPOSAL", "SCHEDULING", "CONFIRMED", "MEETING");
+
+    private final PlanMapper planMapper;
+    private final ChecklistMapper checklistMapper;
+    private final StagePhotoMapper stagePhotoMapper;
+    private final RoomMemberMapper roomMemberMapper;
+
+    public PlanService(PlanMapper planMapper, ChecklistMapper checklistMapper,
+                       StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper) {
+        this.planMapper = planMapper;
+        this.checklistMapper = checklistMapper;
+        this.stagePhotoMapper = stagePhotoMapper;
+        this.roomMemberMapper = roomMemberMapper;
+    }
+
+    @Transactional
+    public PlanResponses.Detail create(long roomId, long userId, PlanRequests.Create request) {
+        assertActiveMember(roomId, userId);
+        Plan plan = new Plan();
+        plan.setRoomId(roomId);
+        plan.setWriterId(userId);
+        plan.setTitle(request.title());
+        plan.setPlanDate(request.planDate());
+        plan.setDescription(request.description());
+        planMapper.insert(plan);
+        return detail(plan.getId(), userId);
+    }
+
+    public PlanResponses.Items<PlanResponses.Summary> list(long roomId, long userId, String status,
+                                                              LocalDate from, LocalDate to) {
+        assertActiveMember(roomId, userId);
+        return new PlanResponses.Items<>(planMapper.findByRoomId(roomId, status, from, to).stream()
+                .map(PlanResponses.Summary::from)
+                .toList());
+    }
+
+    public PlanResponses.Detail detail(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        return PlanResponses.Detail.from(plan, checklistMapper.findByPlanId(planId));
+    }
+
+    @Transactional
+    public PlanResponses.Detail update(long planId, long userId, PlanRequests.Update request) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        if (planMapper.updateByIdAndWriterId(planId, userId, request) != 1) {
+            throw new DomainException(ErrorCode.NOT_WRITER);
+        }
+        return detail(planId, userId);
+    }
+
+    @Transactional
+    public void delete(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        if (planMapper.deleteByIdAndWriterId(planId, userId) != 1) {
+            throw new DomainException(ErrorCode.NOT_WRITER);
+        }
+    }
+
+    @Transactional
+    public PlanResponses.Detail complete(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        planMapper.complete(planId, LocalDateTime.now(ZoneOffset.UTC));
+        return detail(planId, userId);
+    }
+
+    @Transactional
+    public PlanResponses.Detail cancel(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        if (planMapper.cancelByIdAndWriterId(planId, userId) != 1) {
+            throw new DomainException(ErrorCode.NOT_WRITER);
+        }
+        return detail(planId, userId);
+    }
+
+    @Transactional
+    public PlanResponses.Detail skip(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        planMapper.skipMemory(planId);
+        return detail(planId, userId);
+    }
+
+    @Transactional
+    public PlanResponses.Checklist addChecklist(long planId, long userId, PlanRequests.Checklist request) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        PlanChecklist checklist = new PlanChecklist();
+        checklist.setPlanId(planId);
+        checklist.setContent(request.content());
+        checklistMapper.insert(checklist);
+        return PlanResponses.Checklist.from(checklist);
+    }
+
+    @Transactional
+    public PlanResponses.Checklist updateChecklist(long checklistId, long userId,
+                                                    PlanRequests.ChecklistUpdate request) {
+        PlanChecklist checklist = checklistMapper.findById(checklistId)
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+        assertActiveMember(findPlan(checklist.getPlanId()).getRoomId(), userId);
+        checklistMapper.update(checklistId, request);
+        return PlanResponses.Checklist.from(checklistMapper.findById(checklistId).orElseThrow());
+    }
+
+    @Transactional
+    public void deleteChecklist(long checklistId, long userId) {
+        PlanChecklist checklist = checklistMapper.findById(checklistId)
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+        assertActiveMember(findPlan(checklist.getPlanId()).getRoomId(), userId);
+        checklistMapper.deleteById(checklistId);
+    }
+
+    public PlanResponses.Items<PlanResponses.Stage> stages(long planId, long userId) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        return new PlanResponses.Items<>(stageItems(planId));
+    }
+
+    public PlanResponses.Presign presign(long planId, long userId, PlanRequests.Presign request) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        assertStageAvailable(planId, request.stage());
+        return new PlanResponses.Presign("pending-storage-signature", "pending-storage-image-url", 300);
+    }
+
+    @Transactional
+    public PlanResponses.Stage commit(long planId, long userId, PlanRequests.Stage request) {
+        Plan plan = findPlan(planId);
+        assertActiveMember(plan.getRoomId(), userId);
+        assertStageAvailable(planId, request.stage());
+        if (stagePhotoMapper.existsByPlanIdAndStage(planId, request.stage())) {
+            throw new DomainException(ErrorCode.STAGE_ALREADY_UPLOADED);
+        }
+        PlanStagePhoto photo = new PlanStagePhoto();
+        photo.setPlanId(planId);
+        photo.setStage(request.stage());
+        photo.setImageUrl(request.imageUrl());
+        photo.setUploadedBy(userId);
+        stagePhotoMapper.insert(photo);
+        return stageItems(planId).stream()
+                .filter(stage -> stage.stage().equals(request.stage()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private List<PlanResponses.Stage> stageItems(long planId) {
+        Map<String, PlanStagePhoto> photosByStage = new HashMap<>();
+        for (PlanStagePhoto photo : stagePhotoMapper.findByPlanId(planId)) {
+            photosByStage.put(photo.getStage(), photo);
+        }
+        List<PlanResponses.Stage> items = new ArrayList<>();
+        boolean previousDone = true;
+        for (String stage : STAGES) {
+            PlanStagePhoto photo = photosByStage.get(stage);
+            String state = photo != null ? "DONE" : previousDone ? "ACTIVE" : "LOCKED";
+            PlanResponses.Writer uploadedBy = photo == null ? null
+                    : new PlanResponses.Writer(String.valueOf(photo.getUploadedBy()), photo.getNickname(), photo.getProfileImageUrl());
+            items.add(new PlanResponses.Stage(stage, state, photo == null ? null : photo.getImageUrl(),
+                    uploadedBy, photo == null ? null : photo.getCreatedAt()));
+            previousDone = photo != null;
+        }
+        return items;
+    }
+
+    private void assertStageAvailable(long planId, String stage) {
+        int index = STAGES.indexOf(stage);
+        if (index < 0 || (index > 0 && !stagePhotoMapper.existsByPlanIdAndStage(planId, STAGES.get(index - 1)))) {
+            throw new DomainException(ErrorCode.STAGE_LOCKED);
+        }
+    }
+
+    private Plan findPlan(long planId) {
+        return planMapper.findById(planId).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+    }
+
+    private void assertActiveMember(long roomId, long userId) {
+        if (roomMemberMapper.findActiveByRoomIdAndUserId(roomId, userId).isEmpty()) {
+            throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
+        }
+    }
+}
