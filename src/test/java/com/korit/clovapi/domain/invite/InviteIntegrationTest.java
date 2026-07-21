@@ -112,6 +112,25 @@ class InviteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void findMyJoinRequestsReturnsMyOutstandingRequests() throws Exception {
+        long requestId = insertPendingJoinRequest(roomId, applicantId);
+
+        mockMvc.perform(get("/api/v1/join-requests/mine").header("Authorization", bearer(applicantId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(requestId)))
+                .andExpect(jsonPath("$.data.items[0].roomId").value(String.valueOf(roomId)))
+                .andExpect(jsonPath("$.data.items[0].roomName").exists())
+                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data.items[0].roomStatus").value("ACTIVE"));
+
+        // 신청하지 않은 사용자(host)는 빈 목록.
+        mockMvc.perform(get("/api/v1/join-requests/mine").header("Authorization", bearer(hostId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
     void concurrentAcceptUsesOptimisticLock() throws Exception {
         long joinRequestId = insertPendingJoinRequest(roomId, applicantId);
         ExecutorService executor = Executors.newFixedThreadPool(2);

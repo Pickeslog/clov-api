@@ -17,6 +17,8 @@ public interface JoinRequestMapper {
 
     List<RoomJoinRequest> findPendingByRoomId(@Param("roomId") long roomId);
 
+    List<RoomJoinRequest> findMineByUserId(@Param("userId") long userId);
+
     int acceptWithVersion(@Param("joinRequestId") long joinRequestId, @Param("version") int version,
                           @Param("acceptedBy") long acceptedBy, @Param("acceptedAt") LocalDateTime acceptedAt,
                           @Param("undoDeadlineAt") LocalDateTime undoDeadlineAt);

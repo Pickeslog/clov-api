@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.invite.controller;
 
 import com.korit.clovapi.domain.invite.dto.AcceptJoinRequestResponse;
 import com.korit.clovapi.domain.invite.dto.JoinRequestsResponse;
+import com.korit.clovapi.domain.invite.dto.MyJoinRequestsResponse;
 import com.korit.clovapi.domain.invite.service.InviteService;
 import com.korit.clovapi.global.response.ApiResponse;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,11 @@ public class JoinRequestController {
     @GetMapping("/rooms/{roomId}/join-requests")
     public ApiResponse<JoinRequestsResponse> findPending(Authentication authentication, @PathVariable long roomId) {
         return ApiResponse.success(inviteService.findPending(roomId, currentUserId(authentication)));
+    }
+
+    @GetMapping("/join-requests/mine")
+    public ApiResponse<MyJoinRequestsResponse> findMine(Authentication authentication) {
+        return ApiResponse.success(inviteService.findMyJoinRequests(currentUserId(authentication)));
     }
 
     @PostMapping("/join-requests/{joinRequestId}/accept")

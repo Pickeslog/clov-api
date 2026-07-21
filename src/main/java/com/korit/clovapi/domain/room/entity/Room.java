@@ -1,5 +1,6 @@
 package com.korit.clovapi.domain.room.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class Room {
@@ -19,6 +20,9 @@ public class Room {
     private String myStatusMessage;
     private LocalDateTime scheduledDeleteAt;
     private LocalDateTime createdAt;
+    // 요약 전용(다음 예정 약속) — 목록 쿼리 서브쿼리로 채워짐.
+    private String nextPlanTitle;
+    private LocalDate nextPlanDate;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -50,4 +54,8 @@ public class Room {
     public void setScheduledDeleteAt(LocalDateTime scheduledDeleteAt) { this.scheduledDeleteAt = scheduledDeleteAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getNextPlanTitle() { return nextPlanTitle; }
+    public void setNextPlanTitle(String nextPlanTitle) { this.nextPlanTitle = nextPlanTitle; }
+    public LocalDate getNextPlanDate() { return nextPlanDate; }
+    public void setNextPlanDate(LocalDate nextPlanDate) { this.nextPlanDate = nextPlanDate; }
 }

@@ -20,6 +20,8 @@
         <result property="myStatusMessage" column="my_status_message"/>
         <result property="scheduledDeleteAt" column="scheduled_delete_at"/>
         <result property="createdAt" column="created_at"/>
+        <result property="nextPlanTitle" column="next_plan_title"/>
+        <result property="nextPlanDate" column="next_plan_date"/>
     </resultMap>
 
     <resultMap id="expLogResultMap" type="com.korit.clovapi.domain.room.entity.FriendshipExpLog">
@@ -57,9 +59,15 @@
         SELECT r.id, r.name, r.description, r.theme_color, r.transport_type, r.cover_photo_url,
                r.friendship_level, r.status, r.created_at, me.is_favorite,
                (SELECT COUNT(*) FROM room_members a
-                WHERE a.room_id = r.id AND a.status = 'ACTIVE') AS member_count
+                WHERE a.room_id = r.id AND a.status = 'ACTIVE') AS member_count,
+               np.title AS next_plan_title, np.plan_date AS next_plan_date
         FROM friendship_rooms r
         JOIN room_members me ON me.room_id = r.id AND me.user_id = #{userId} AND me.status = 'ACTIVE'
+        LEFT JOIN plans np ON np.id = (
+            SELECT p.id FROM plans p
+            WHERE p.room_id = r.id AND p.status = 'SCHEDULED' AND p.plan_date >= CURDATE()
+            ORDER BY p.plan_date ASC, p.id ASC LIMIT 1
+        )
         WHERE r.status = 'ACTIVE'
         ORDER BY me.is_favorite DESC, r.created_at DESC
     </select>
