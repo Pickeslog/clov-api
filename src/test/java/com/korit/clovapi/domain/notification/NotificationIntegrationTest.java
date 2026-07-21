@@ -59,14 +59,14 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications")
                         .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2));
+                .andExpect(jsonPath("$.data.items.length()").value(2));
 
         // With type filter
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications?type=NOTICE")
                         .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].type").value("NOTICE"));
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].type").value("NOTICE"));
 
         // Non-member approach
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications")
@@ -98,7 +98,8 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
     void markAllAsRead() throws Exception {
         mockMvc.perform(patch("/api/v1/rooms/" + roomId + "/notifications/read-all")
                         .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.updatedCount").value(2));
 
         // Check if actually all read
         Long unreadCount = jdbcTemplate.queryForObject(

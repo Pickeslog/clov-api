@@ -20,5 +20,5 @@ public interface NotificationMapper {
 
     void markAsRead(@Param("id") Long id);
 
-    void markAllAsRead(@Param("roomId") Long roomId, @Param("recipientId") Long recipientId);
+    int markAllAsRead(@Param("roomId") Long roomId, @Param("recipientId") Long recipientId);
 }
