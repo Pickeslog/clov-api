@@ -55,7 +55,8 @@ public class InviteService {
         invite.setInviteCode(nextInviteCode());
         invite.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(expiresInHours));
         inviteMapper.insert(invite);
-        return InviteResponse.from(invite);
+        return InviteResponse.from(inviteMapper.findById(invite.getId())
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
 
     public InvitesResponse findByRoomId(long roomId, long userId) {
@@ -91,7 +92,8 @@ public class InviteService {
         joinRequest.setUserId(userId);
         joinRequest.setInviteId(invite.getId());
         joinRequestMapper.insert(joinRequest);
-        return JoinRequestResponse.from(joinRequest);
+        return JoinRequestResponse.from(joinRequestMapper.findById(joinRequest.getId())
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
 
     public JoinRequestsResponse findPending(long roomId, long userId) {
