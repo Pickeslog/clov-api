@@ -8,6 +8,8 @@ import com.korit.clovapi.domain.letter.dto.LetterResponse;
 import com.korit.clovapi.domain.letter.dto.LetterSendRequest;
 import com.korit.clovapi.domain.letter.entity.LuckyLetter;
 import com.korit.clovapi.domain.letter.mapper.LetterMapper;
+import com.korit.clovapi.domain.room.entity.RoomMember;
+import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -21,11 +23,14 @@ import java.util.List;
 public class LetterService {
 
     private static final String DEFAULT_EMOJI = "💌";
+    private static final String ACTIVE_STATUS = "ACTIVE";
 
     private final LetterMapper letterMapper;
+    private final RoomMemberMapper roomMemberMapper;
 
-    public LetterService(LetterMapper letterMapper) {
+    public LetterService(LetterMapper letterMapper, RoomMemberMapper roomMemberMapper) {
         this.letterMapper = letterMapper;
+        this.roomMemberMapper = roomMemberMapper;
     }
 
     @Transactional
@@ -42,7 +47,11 @@ public class LetterService {
         LocalDateTime sentAt = LocalDateTime.now(ZoneOffset.UTC);
 
         if (isBroadcast) {
-            List<Long> receiverIds = letterMapper.findActiveMemberUserIds(roomId, senderId);
+            List<Long> receiverIds = roomMemberMapper.findByRoomId(roomId).stream()
+                    .filter(member -> ACTIVE_STATUS.equals(member.getStatus()))
+                    .map(RoomMember::getUserId)
+                    .filter(memberId -> memberId != senderId)
+                    .toList();
             if (!receiverIds.isEmpty()) {
                 letterMapper.insertBroadcast(roomId, senderId, receiverIds, request.content(), emoji, sentAt);
             }
@@ -113,7 +122,7 @@ public class LetterService {
     }
 
     private void requireActiveMember(long roomId, long userId) {
-        if (!letterMapper.isActiveRoomMember(roomId, userId)) {
+        if (roomMemberMapper.findActiveByRoomIdAndUserId(roomId, userId).isEmpty()) {
             throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
         }
     }

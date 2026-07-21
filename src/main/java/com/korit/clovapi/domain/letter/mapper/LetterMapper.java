@@ -12,10 +12,6 @@ import java.util.Optional;
 @Mapper
 public interface LetterMapper {
 
-    boolean isActiveRoomMember(@Param("roomId") long roomId, @Param("userId") long userId);
-
-    List<Long> findActiveMemberUserIds(@Param("roomId") long roomId, @Param("excludeUserId") long excludeUserId);
-
     void insert(LuckyLetter letter);
 
     void insertBroadcast(
