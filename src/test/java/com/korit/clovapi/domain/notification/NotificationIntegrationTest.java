@@ -142,7 +142,7 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
     private long insertNotification(long roomId, long recipientId, String type) {
         jdbcTemplate.update(
                 "INSERT INTO notifications (room_id, recipient_id, actor_id, type, reference_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, false, NOW())",
-                roomId, recipientId, recipientId, type, "test_ref_" + UUID.randomUUID().toString().substring(0, 5)
+                roomId, recipientId, recipientId, type, (Long) null
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
