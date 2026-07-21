@@ -96,6 +96,28 @@ class PlanIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void deletePlanRemovesChildChecklistsAndStagePhotos() throws Exception {
+        long planId = createPlan(tokenFor(userId), "Deletable plan", "2026-07-24");
+        // 자식 행 생성: 체크리스트 + 단계사진(PROPOSAL) — 둘 다 plans FK(no cascade).
+        mockMvc.perform(post("/api/v1/plans/{planId}/checklists", planId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"pack bags\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/plans/{planId}/stage-photos", planId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stage\":\"PROPOSAL\",\"imageUrl\":\"https://test/p.jpg\"}"))
+                .andExpect(status().isOk());
+
+        // 자식이 있어도 삭제가 성공해야 한다(예전엔 FK 위반으로 500).
+        mockMvc.perform(delete("/api/v1/plans/{planId}", planId).header("Authorization", tokenFor(userId)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/plans/{planId}", planId).header("Authorization", tokenFor(userId)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void presignReturnsSignedPutUrlForAvailableStage() throws Exception {
         long planId = createPlan(tokenFor(userId), "Presign plan", "2026-07-22");
 

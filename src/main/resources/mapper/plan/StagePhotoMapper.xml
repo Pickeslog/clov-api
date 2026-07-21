@@ -35,4 +35,9 @@
         INSERT INTO plan_stage_photos (plan_id, stage, image_url, uploaded_by)
         VALUES (#{planId}, #{stage}, #{imageUrl}, #{uploadedBy})
     </insert>
+
+    <delete id="deleteByPlanId">
+        DELETE FROM plan_stage_photos
+        WHERE plan_id = #{planId}
+    </delete>
 </mapper>

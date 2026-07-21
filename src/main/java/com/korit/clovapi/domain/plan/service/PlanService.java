@@ -87,6 +87,11 @@ public class PlanService {
     public void delete(long planId, long userId) {
         Plan plan = findPlan(planId);
         assertActiveMember(plan.getRoomId(), userId);
+        // plan 소유 자식(체크리스트·단계사진)을 먼저 지운다 — FK에 ON DELETE CASCADE가 없어
+        // 남아 있으면 plans 삭제가 제약 위반으로 실패한다. 비작성자면 아래 삭제가 0행 →
+        // 예외로 트랜잭션이 롤백돼 자식 삭제도 되돌려진다.
+        checklistMapper.deleteByPlanId(planId);
+        stagePhotoMapper.deleteByPlanId(planId);
         if (planMapper.deleteByIdAndWriterId(planId, userId) != 1) {
             throw new DomainException(ErrorCode.NOT_WRITER);
         }

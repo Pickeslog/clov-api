@@ -14,4 +14,6 @@ public interface StagePhotoMapper {
     boolean existsByPlanIdAndStage(@Param("planId") long planId, @Param("stage") String stage);
 
     void insert(PlanStagePhoto photo);
+
+    void deleteByPlanId(@Param("planId") long planId);
 }
