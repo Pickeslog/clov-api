@@ -1,5 +1,9 @@
 package com.korit.clovapi.domain.memory.dto;
 
-// shape only; image upload (R2) never populates rows, so this list is always empty in R1
+import com.korit.clovapi.domain.memory.entity.MemoryImage;
+
 public record MemoryImageResponse(String id, String imageUrl, Integer sortOrder) {
+    public static MemoryImageResponse from(MemoryImage image) {
+        return new MemoryImageResponse(String.valueOf(image.getId()), image.getImageUrl(), image.getSortOrder());
+    }
 }

@@ -64,6 +64,8 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
 
     @AfterEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM memory_images WHERE memory_id IN "
+                + "(SELECT id FROM memories WHERE room_id = ?)", roomId);
         jdbcTemplate.update("DELETE FROM memory_participants WHERE memory_id IN "
                 + "(SELECT id FROM memories WHERE room_id = ?)", roomId);
         jdbcTemplate.update("DELETE FROM memory_tags WHERE memory_id IN "
@@ -176,6 +178,106 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                         .content("{\"title\":\"Second attempt\",\"content\":\"Again\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("MEMORY_ALREADY_WRITTEN"));
+    }
+
+    @Test
+    void memoryImagePresignCommitReorderDeleteFollowContractAndAuthorization() throws Exception {
+        long memoryId = createFreeMemory();
+
+        // presign (작성자) → 서명 PUT URL
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/images/presign", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/jpeg\",\"fileSize\":204800}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.startsWith("https://")))
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.containsString("X-Amz-Signature")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.containsString("memories/" + memoryId + "/")))
+                .andExpect(jsonPath("$.data.expiresIn").value(300));
+
+        // 커밋 3장 → sort_order 0,1,2
+        long img0 = commitImage(memoryId, "https://cdn.test/a.jpg");
+        long img1 = commitImage(memoryId, "https://cdn.test/b.jpg");
+        long img2 = commitImage(memoryId, "https://cdn.test/c.jpg");
+
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.images.length()").value(3))
+                .andExpect(jsonPath("$.data.images[0].id").value(String.valueOf(img0)))
+                .andExpect(jsonPath("$.data.images[2].id").value(String.valueOf(img2)));
+
+        // 순서 재정렬(역순) → sort_order 재부여
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}/images/order", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imageIds\":[\"" + img2 + "\",\"" + img1 + "\",\"" + img0 + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.images[0].id").value(String.valueOf(img2)))
+                .andExpect(jsonPath("$.data.images[0].sortOrder").value(0))
+                .andExpect(jsonPath("$.data.images[2].id").value(String.valueOf(img0)));
+
+        // 비작성자(멤버) → NOT_WRITER
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", roomId, otherId);
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/images/presign", memoryId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/jpeg\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_WRITER"));
+        mockMvc.perform(delete("/api/v1/memory-images/{imageId}", img0)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_WRITER"));
+
+        // 작성자 삭제 → 2장 남음
+        mockMvc.perform(delete("/api/v1/memory-images/{imageId}", img1)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.images.length()").value(2));
+    }
+
+    @Test
+    void imageQuotaReturns507WhenExceeded() throws Exception {
+        long memoryId = createFreeMemory();
+        for (int i = 0; i < 10; i++) {
+            commitImage(memoryId, "https://cdn.test/q" + i + ".jpg");
+        }
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/images/presign", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/jpeg\"}"))
+                .andExpect(status().is(507))
+                .andExpect(jsonPath("$.error.code").value("STORAGE_QUOTA_EXCEEDED"));
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/images", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imageUrl\":\"https://cdn.test/over.jpg\"}"))
+                .andExpect(status().is(507))
+                .andExpect(jsonPath("$.error.code").value("STORAGE_QUOTA_EXCEEDED"));
+    }
+
+    private long createFreeMemory() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Photos\",\"content\":\"trip\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+    }
+
+    private long commitImage(long memoryId, String imageUrl) throws Exception {
+        MvcResult res = mockMvc.perform(post("/api/v1/memories/{memoryId}/images", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imageUrl\":\"" + imageUrl + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return Long.parseLong(JsonPath.read(res.getResponse().getContentAsString(), "$.data.id"));
     }
 
     private MvcResult signup(String email, String nickname) throws Exception {

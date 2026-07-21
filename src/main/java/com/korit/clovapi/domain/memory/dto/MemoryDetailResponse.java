@@ -13,7 +13,8 @@ public record MemoryDetailResponse(
         List<MemoryImageResponse> images, List<String> tags, List<UserSummaryResponse> participants,
         int commentCount, LocalDateTime createdAt
 ) {
-    public static MemoryDetailResponse from(Memory memory, List<String> tags, List<UserSummaryResponse> participants) {
+    public static MemoryDetailResponse from(Memory memory, List<MemoryImageResponse> images, List<String> tags,
+                                            List<UserSummaryResponse> participants) {
         return new MemoryDetailResponse(
                 String.valueOf(memory.getId()),
                 String.valueOf(memory.getRoomId()),
@@ -21,7 +22,7 @@ public record MemoryDetailResponse(
                 new UserSummaryResponse(String.valueOf(memory.getWriterId()), memory.getWriterNickname(),
                         memory.getWriterProfileImageUrl()),
                 memory.getTitle(), memory.getContent(), memory.getMemoryDate(),
-                List.of(), tags, participants,
+                images, tags, participants,
                 memory.getCommentCount() == null ? 0 : memory.getCommentCount(), memory.getCreatedAt());
     }
 }
