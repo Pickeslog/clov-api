@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.room.mapper.RoomMapper">
+
+    <resultMap id="roomResultMap" type="com.korit.clovapi.domain.room.entity.Room">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="themeColor" column="theme_color"/>
+        <result property="transportType" column="transport_type"/>
+        <result property="coverPhotoUrl" column="cover_photo_url"/>
+        <result property="coverTitle" column="cover_title"/>
+        <result property="friendshipLevel" column="friendship_level"/>
+        <result property="expPoint" column="exp_point"/>
+        <result property="status" column="status"/>
+        <result property="memberCount" column="member_count"/>
+        <result property="favorite" column="is_favorite"/>
+        <result property="myStatusMessage" column="my_status_message"/>
+        <result property="scheduledDeleteAt" column="scheduled_delete_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <resultMap id="expLogResultMap" type="com.korit.clovapi.domain.room.entity.FriendshipExpLog">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="triggeredBy" column="triggered_by"/>
+        <result property="nickname" column="nickname"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="actionType" column="action_type"/>
+        <result property="expDelta" column="exp_delta"/>
+        <result property="referenceId" column="reference_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO friendship_rooms (
+            name, description, theme_color, transport_type, cover_photo_url, cover_title
+        ) VALUES (
+            #{name}, #{description}, #{themeColor}, #{transportType}, #{coverPhotoUrl}, #{coverTitle}
+        )
+    </insert>
+
+    <select id="findDetailByIdAndUserId" resultMap="roomResultMap">
+        SELECT r.id, r.name, r.description, r.theme_color, r.transport_type, r.cover_photo_url, r.cover_title,
+               r.friendship_level, r.exp_point, r.status, r.scheduled_delete_at, r.created_at,
+               (SELECT COUNT(*) FROM room_members active_members
+                WHERE active_members.room_id = r.id AND active_members.status = 'ACTIVE') AS member_count,
+               me.is_favorite, me.status_message AS my_status_message
+        FROM friendship_rooms r
+        JOIN room_members me ON me.room_id = r.id AND me.user_id = #{userId}
+        WHERE r.id = #{roomId}
+    </select>
+
+    <select id="findById" resultMap="roomResultMap">
+        SELECT id, name, description, theme_color, transport_type, cover_photo_url, cover_title,
+               friendship_level, exp_point, status, scheduled_delete_at, created_at
+        FROM friendship_rooms
+        WHERE id = #{roomId}
+    </select>
+
+    <update id="update">
+        UPDATE friendship_rooms
+        <set>
+            <if test="request.has('name')">name = #{request.name},</if>
+            <if test="request.has('description')">description = #{request.description},</if>
+            <if test="request.has('themeColor')">theme_color = #{request.themeColor},</if>
+            <if test="request.has('transportType')">transport_type = #{request.transportType},</if>
+            <if test="request.has('coverPhotoUrl')">cover_photo_url = #{request.coverPhotoUrl},</if>
+            <if test="request.has('coverTitle')">cover_title = #{request.coverTitle},</if>
+        </set>
+        WHERE id = #{roomId}
+    </update>
+
+    <insert id="insertRoomUpdateNotifications">
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type)
+        SELECT #{roomId}, user_id, #{actorId}, 'NOTICE'
+        FROM room_members
+        WHERE room_id = #{roomId} AND status = 'ACTIVE'
+    </insert>
+
+    <update id="updateStatusInactive">
+        UPDATE friendship_rooms
+        SET status = 'INACTIVE', scheduled_delete_at = #{scheduledDeleteAt}
+        WHERE id = #{roomId}
+    </update>
+
+    <update id="revive">
+        UPDATE friendship_rooms
+        SET status = 'ACTIVE', scheduled_delete_at = NULL
+        WHERE id = #{roomId}
+    </update>
+
+    <select id="findExpLogs" resultMap="expLogResultMap">
+        SELECT l.id, l.room_id, l.triggered_by, u.nickname, u.profile_image_url, l.action_type,
+               l.exp_delta, l.reference_id, l.created_at
+        FROM friendship_exp_logs l
+        JOIN users u ON u.id = l.triggered_by
+        WHERE l.room_id = #{roomId}
+        ORDER BY l.created_at DESC, l.id DESC
+    </select>
+
+    <select id="countMascotInteractionsToday" resultType="int">
+        SELECT COUNT(*)
+        FROM friendship_exp_logs
+        WHERE room_id = #{roomId}
+          AND triggered_by = #{userId}
+          AND action_type = 'MASCOT_INTERACT'
+          AND created_at >= #{startOfDay}
+    </select>
+
+    <insert id="insertExpLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO friendship_exp_logs (room_id, triggered_by, action_type, exp_delta, reference_id)
+        VALUES (#{roomId}, #{triggeredBy}, #{actionType}, #{expDelta}, #{referenceId})
+    </insert>
+
+    <update id="addExp">
+        UPDATE friendship_rooms
+        SET exp_point = exp_point + #{expDelta}
+        WHERE id = #{roomId}
+    </update>
+</mapper>
