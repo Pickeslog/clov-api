@@ -6,12 +6,15 @@ import com.korit.clovapi.domain.user.dto.UpdatePreferencesRequest;
 import com.korit.clovapi.domain.user.dto.UpdateProfileRequest;
 import com.korit.clovapi.domain.user.dto.UserProfileResponse;
 import com.korit.clovapi.domain.user.service.UserService;
+import com.korit.clovapi.global.dto.PresignRequest;
+import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,6 +45,12 @@ public class UserController {
                                             @Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(currentUserId(authentication), request);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/me/profile-image/presign")
+    public ApiResponse<PresignResponse> presignProfileImage(Authentication authentication,
+                                                            @Valid @RequestBody PresignRequest request) {
+        return ApiResponse.success(userService.presignProfileImage(currentUserId(authentication), request));
     }
 
     @DeleteMapping("/me")

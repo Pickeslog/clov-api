@@ -9,12 +9,17 @@ import com.korit.clovapi.domain.user.dto.UpdateProfileRequest;
 import com.korit.clovapi.domain.user.dto.UserProfileResponse;
 import com.korit.clovapi.domain.user.entity.UserPreference;
 import com.korit.clovapi.domain.user.mapper.UserPreferenceMapper;
+import com.korit.clovapi.global.dto.PresignRequest;
+import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import com.korit.clovapi.global.security.refresh.RefreshTokenMapper;
+import com.korit.clovapi.global.storage.StoragePresigner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @Service
 public class UserService {
@@ -23,13 +28,26 @@ public class UserService {
     private final UserPreferenceMapper preferenceMapper;
     private final RefreshTokenMapper refreshTokenMapper;
     private final PasswordEncoder passwordEncoder;
+    private final StoragePresigner storagePresigner;
 
     public UserService(UserMapper userMapper, UserPreferenceMapper preferenceMapper,
-                       RefreshTokenMapper refreshTokenMapper, PasswordEncoder passwordEncoder) {
+                       RefreshTokenMapper refreshTokenMapper, PasswordEncoder passwordEncoder,
+                       StoragePresigner storagePresigner) {
         this.userMapper = userMapper;
         this.preferenceMapper = preferenceMapper;
         this.refreshTokenMapper = refreshTokenMapper;
         this.passwordEncoder = passwordEncoder;
+        this.storagePresigner = storagePresigner;
+    }
+
+    /**
+     * 프로필 이미지 업로드용 presigned PUT URL 발급(계약 §5·§4-3). 클라가 uploadUrl로 PUT 후
+     * PATCH /me의 profileImageUrl에 imageUrl을 넣어 커밋한다. 쿼터 없음(1인 1장 교체).
+     */
+    public PresignResponse presignProfileImage(long userId, PresignRequest request) {
+        String objectKey = "users/%d/profile-%s%s".formatted(
+                userId, UUID.randomUUID(), StoragePresigner.extensionFor(request.contentType()));
+        return PresignResponse.from(storagePresigner.presignPut(objectKey, request.contentType()));
     }
 
     public UserProfileResponse findMyProfile(long userId) {
