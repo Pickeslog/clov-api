@@ -2,7 +2,10 @@ package com.korit.clovapi.global.storage;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -32,6 +35,11 @@ class StoragePresignerTest {
             assertTrue(uploadUrl.contains("clov-media/rooms/1/plans/2/proposal-abc.jpg"), uploadUrl);
             assertTrue(uploadUrl.contains("X-Amz-Signature"), uploadUrl);
             assertTrue(uploadUrl.contains("X-Amz-Expires=300"), uploadUrl);
+            // 브라우저 PUT은 Content-Type 외 헤더를 못 맞춘다. AWS SDK v2 2.30+가 기본으로
+            // 끼워 넣는 flexible-checksum 서명(x-amz-sdk-checksum-algorithm 등)이 URL에 있으면
+            // R2로의 presigned PUT이 브라우저에서 깨진다 → 서명에 checksum이 없어야 한다.
+            assertFalse(uploadUrl.toLowerCase(Locale.ROOT).contains("checksum"),
+                    "presigned URL이 checksum 헤더를 요구하면 브라우저 PUT이 깨진다: " + uploadUrl);
             // 공개 조회 URL은 public-base-url 기준(끝 슬래시 중복 없이).
             assertEquals("https://pub-testhash.r2.dev/rooms/1/plans/2/proposal-abc.jpg", result.imageUrl());
             assertEquals(300, result.expiresIn());
