@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.user.mapper.UserPreferenceMapper">
+
+    <resultMap id="preferenceResultMap" type="com.korit.clovapi.domain.user.entity.UserPreference">
+        <result property="darkMode" column="dark_mode"/>
+        <result property="customColor" column="custom_color"/>
+        <result property="wallpaperIcon" column="wallpaper_icon"/>
+        <result property="dashboardBackground" column="dashboard_background"/>
+        <result property="letterTheme" column="letter_theme"/>
+        <result property="memoryCardTheme" column="memory_card_theme"/>
+        <result property="mascotType" column="mascot_type"/>
+    </resultMap>
+
+    <select id="findByUserId" resultMap="preferenceResultMap">
+        SELECT dark_mode, custom_color, wallpaper_icon, dashboard_background,
+               letter_theme, memory_card_theme, mascot_type
+        FROM user_preferences
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insertDefault">
+        INSERT INTO user_preferences (user_id, letter_theme, memory_card_theme)
+        VALUES (#{userId}, 'postbox', 'clothesline')
+    </insert>
+
+    <update id="update">
+        UPDATE user_preferences
+        <set>
+            <if test="request.darkMode != null">dark_mode = #{request.darkMode},</if>
+            <if test="request.customColor != null">custom_color = #{request.customColor},</if>
+            <if test="request.wallpaperIcon != null">wallpaper_icon = #{request.wallpaperIcon},</if>
+            <if test="request.dashboardBackground != null">dashboard_background = #{request.dashboardBackground},</if>
+            <if test="request.letterTheme != null">letter_theme = #{request.letterTheme},</if>
+            <if test="request.memoryCardTheme != null">memory_card_theme = #{request.memoryCardTheme},</if>
+            <if test="request.mascotType != null">mascot_type = #{request.mascotType},</if>
+        </set>
+        WHERE user_id = #{userId}
+    </update>
+</mapper>

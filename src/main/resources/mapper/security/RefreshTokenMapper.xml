@@ -32,4 +32,5 @@
         WHERE token_hash = #{tokenHash}
           AND revoked_at IS NULL
     </update>
+    <update id="revokeAllByUserId">UPDATE refresh_tokens SET revoked_at=CURRENT_TIMESTAMP WHERE user_id=#{userId} AND revoked_at IS NULL</update>
 </mapper>

@@ -51,7 +51,7 @@ app:
 
 mybatis:
   mapper-locations: classpath:/mapper/**/*.xml
-  type-aliases-package: com.korit.clovapi.domain.auth.entity,com.korit.clovapi.domain.room.entity,com.korit.clovapi.domain.invite.entity,com.korit.clovapi.domain.plan.entity,com.korit.clovapi.domain.memory.entity,com.korit.clovapi.domain.letter.entity,com.korit.clovapi.domain.notification.entity
+  type-aliases-package: com.korit.clovapi.domain.auth.entity,com.korit.clovapi.domain.room.entity,com.korit.clovapi.domain.invite.entity,com.korit.clovapi.domain.plan.entity,com.korit.clovapi.domain.memory.entity,com.korit.clovapi.domain.letter.entity,com.korit.clovapi.domain.notification.entity,com.korit.clovapi.domain.user.entity
   configuration:
     map-underscore-to-camel-case: true
     jdbc-type-for-null: "NULL"
