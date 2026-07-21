@@ -1,10 +1,16 @@
 package com.korit.clovapi.domain.memory.controller;
 
+import com.korit.clovapi.domain.memory.dto.CommitImageRequest;
 import com.korit.clovapi.domain.memory.dto.CreateMemoryRequest;
 import com.korit.clovapi.domain.memory.dto.MemoryDetailResponse;
 import com.korit.clovapi.domain.memory.dto.MemoryFeedResponse;
+import com.korit.clovapi.domain.memory.dto.MemoryImageResponse;
+import com.korit.clovapi.domain.memory.dto.MemoryImagesResponse;
+import com.korit.clovapi.domain.memory.dto.ReorderImagesRequest;
 import com.korit.clovapi.domain.memory.dto.UpdateMemoryRequest;
 import com.korit.clovapi.domain.memory.service.MemoryService;
+import com.korit.clovapi.global.dto.PresignRequest;
+import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -81,6 +87,30 @@ public class MemoryController {
     public ApiResponse<Void> delete(Authentication authentication, @PathVariable long memoryId) {
         memoryService.delete(memoryId, currentUserId(authentication));
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/api/v1/memories/{memoryId}/images/presign")
+    public ApiResponse<PresignResponse> presignImage(Authentication authentication, @PathVariable long memoryId,
+                                                     @Valid @RequestBody PresignRequest request) {
+        return ApiResponse.success(memoryService.presignImage(memoryId, currentUserId(authentication), request));
+    }
+
+    @PostMapping("/api/v1/memories/{memoryId}/images")
+    public ApiResponse<MemoryImageResponse> commitImage(Authentication authentication, @PathVariable long memoryId,
+                                                        @Valid @RequestBody CommitImageRequest request) {
+        return ApiResponse.success(memoryService.commitImage(memoryId, currentUserId(authentication), request));
+    }
+
+    @DeleteMapping("/api/v1/memory-images/{imageId}")
+    public ApiResponse<Void> deleteImage(Authentication authentication, @PathVariable long imageId) {
+        memoryService.deleteImage(imageId, currentUserId(authentication));
+        return ApiResponse.success(null);
+    }
+
+    @PatchMapping("/api/v1/memories/{memoryId}/images/order")
+    public ApiResponse<MemoryImagesResponse> reorderImages(Authentication authentication, @PathVariable long memoryId,
+                                                           @Valid @RequestBody ReorderImagesRequest request) {
+        return ApiResponse.success(memoryService.reorderImages(memoryId, currentUserId(authentication), request));
     }
 
     private long currentUserId(Authentication authentication) {
