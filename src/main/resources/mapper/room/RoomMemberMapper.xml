@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.room.mapper.RoomMemberMapper">
+
+    <resultMap id="roomMemberResultMap" type="com.korit.clovapi.domain.room.entity.RoomMember">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+        <result property="status" column="status"/>
+        <result property="favorite" column="is_favorite"/>
+        <result property="statusMessage" column="status_message"/>
+        <result property="joinedAt" column="joined_at"/>
+        <result property="leftAt" column="left_at"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO room_members (room_id, user_id)
+        VALUES (#{roomId}, #{userId})
+    </insert>
+
+    <select id="findActiveByRoomIdAndUserId" resultMap="roomMemberResultMap">
+        SELECT id, room_id, user_id, status, is_favorite, status_message, joined_at, left_at
+        FROM room_members
+        WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'ACTIVE'
+    </select>
+
+    <select id="findByRoomId" resultMap="roomMemberResultMap">
+        SELECT m.id, m.room_id, m.user_id, u.nickname, u.profile_image_url, m.status,
+               m.is_favorite, m.status_message, m.joined_at, m.left_at
+        FROM room_members m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.room_id = #{roomId}
+        ORDER BY m.joined_at ASC, m.id ASC
+    </select>
+
+    <update id="leave">
+        UPDATE room_members
+        SET status = 'LEFT', left_at = #{leftAt}
+        WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'ACTIVE'
+    </update>
+
+    <select id="countActiveByRoomId" resultType="int">
+        SELECT COUNT(*) FROM room_members WHERE room_id = #{roomId} AND status = 'ACTIVE'
+    </select>
+
+    <update id="updateStatusMessage">
+        UPDATE room_members
+        SET status_message = #{statusMessage}
+        WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'ACTIVE'
+    </update>
+
+    <update id="updateFavorite">
+        UPDATE room_members
+        SET is_favorite = #{isFavorite}
+        WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'ACTIVE'
+    </update>
+
+    <update id="revive">
+        UPDATE room_members
+        SET status = 'ACTIVE', left_at = NULL, joined_at = #{joinedAt}
+        WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'LEFT'
+    </update>
+</mapper>
