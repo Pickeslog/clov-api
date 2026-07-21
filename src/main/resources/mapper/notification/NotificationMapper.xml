@@ -47,13 +47,5 @@
           AND is_read = false
     </update>
 
-    <select id="isRoomMemberActive" resultType="boolean">
-        SELECT EXISTS(
-            SELECT 1
-            FROM room_members
-            WHERE room_id = #{roomId}
-              AND user_id = #{userId}
-              AND status = 'ACTIVE'
-        )
-    </select>
+
 </mapper>

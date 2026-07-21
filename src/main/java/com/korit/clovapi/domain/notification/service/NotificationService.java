@@ -3,6 +3,7 @@ package com.korit.clovapi.domain.notification.service;
 import com.korit.clovapi.domain.notification.dto.NotificationResponse;
 import com.korit.clovapi.domain.notification.entity.Notification;
 import com.korit.clovapi.domain.notification.mapper.NotificationMapper;
+import com.korit.clovapi.domain.room.service.RoomService;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -14,15 +15,15 @@ import java.util.stream.Collectors;
 public class NotificationService {
     
     private final NotificationMapper notificationMapper;
+    private final RoomService roomService;
 
-    public NotificationService(NotificationMapper notificationMapper) {
+    public NotificationService(NotificationMapper notificationMapper, RoomService roomService) {
         this.notificationMapper = notificationMapper;
+        this.roomService = roomService;
     }
 
     public List<NotificationResponse> getNotifications(Long roomId, Long requesterId, String type, int page, int size) {
-        if (!notificationMapper.isRoomMemberActive(roomId, requesterId)) {
-            throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
-        }
+        roomService.assertActiveMember(roomId, requesterId);
         
         int offset = page * size;
         return notificationMapper.getNotifications(roomId, requesterId, type, offset, size)
@@ -45,9 +46,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(Long roomId, Long requesterId) {
-        if (!notificationMapper.isRoomMemberActive(roomId, requesterId)) {
-            throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
-        }
+        roomService.assertActiveMember(roomId, requesterId);
         
         notificationMapper.markAllAsRead(roomId, requesterId);
     }
