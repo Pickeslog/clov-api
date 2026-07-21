@@ -53,6 +53,17 @@
         WHERE r.id = #{roomId}
     </select>
 
+    <select id="findSummariesByMemberUserId" resultMap="roomResultMap">
+        SELECT r.id, r.name, r.description, r.theme_color, r.transport_type, r.cover_photo_url,
+               r.friendship_level, r.status, r.created_at, me.is_favorite,
+               (SELECT COUNT(*) FROM room_members a
+                WHERE a.room_id = r.id AND a.status = 'ACTIVE') AS member_count
+        FROM friendship_rooms r
+        JOIN room_members me ON me.room_id = r.id AND me.user_id = #{userId} AND me.status = 'ACTIVE'
+        WHERE r.status = 'ACTIVE'
+        ORDER BY me.is_favorite DESC, r.created_at DESC
+    </select>
+
     <select id="findById" resultMap="roomResultMap">
         SELECT id, name, description, theme_color, transport_type, cover_photo_url, cover_title,
                friendship_level, exp_point, status, scheduled_delete_at, created_at
