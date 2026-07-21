@@ -1,0 +1,2 @@
+package com.korit.clovapi.domain.plan.entity;
+public class PlanChecklist { private Long id,planId; private String content; private Boolean checked; public Long getId(){return id;} public void setId(Long v){id=v;} public Long getPlanId(){return planId;} public void setPlanId(Long v){planId=v;} public String getContent(){return content;} public void setContent(String v){content=v;} public Boolean getChecked(){return checked;} public void setChecked(Boolean v){checked=v;} }
