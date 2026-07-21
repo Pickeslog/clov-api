@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.memory.mapper.MemoryMapper">
+
+    <resultMap id="memoryResultMap" type="com.korit.clovapi.domain.memory.entity.Memory">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="planId" column="plan_id"/>
+        <result property="writerId" column="writer_id"/>
+        <result property="writerNickname" column="writer_nickname"/>
+        <result property="writerProfileImageUrl" column="writer_profile_image_url"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="memoryDate" column="memory_date"/>
+        <result property="tagsCsv" column="tags_csv"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="deletedAt" column="deleted_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="participantRowMap" type="com.korit.clovapi.domain.memory.mapper.ParticipantRow">
+        <result property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="profileImageUrl" column="profile_image_url"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO memories (room_id, plan_id, writer_id, title, content, memory_date)
+        VALUES (#{roomId}, #{planId}, #{writerId}, #{title}, #{content}, #{memoryDate})
+    </insert>
+
+    <select id="findById" resultMap="memoryResultMap">
+        SELECT m.id, m.room_id, m.plan_id, m.writer_id, u.nickname AS writer_nickname,
+               u.profile_image_url AS writer_profile_image_url, m.title, m.content, m.memory_date,
+               m.deleted_at, m.created_at, m.updated_at,
+               (SELECT COUNT(*) FROM memory_comments c WHERE c.memory_id = m.id) AS comment_count
+        FROM memories m
+        JOIN users u ON u.id = m.writer_id
+        WHERE m.id = #{memoryId} AND m.deleted_at IS NULL
+    </select>
+
+    <select id="findByPlanIdAndWriterId" resultMap="memoryResultMap">
+        SELECT m.id, m.room_id, m.plan_id, m.writer_id, u.nickname AS writer_nickname,
+               u.profile_image_url AS writer_profile_image_url, m.title, m.content, m.memory_date,
+               m.deleted_at, m.created_at, m.updated_at
+        FROM memories m
+        JOIN users u ON u.id = m.writer_id
+        WHERE m.plan_id = #{planId} AND m.writer_id = #{writerId} AND m.deleted_at IS NULL
+    </select>
+
+    <select id="findPlanRoomId" resultType="long">
+        SELECT room_id FROM plans WHERE id = #{planId}
+    </select>
+
+    <select id="findPlanMemoryStatus" resultType="string">
+        SELECT memory_status FROM plans WHERE id = #{planId}
+    </select>
+
+    <update id="updatePlanMemoryStatusWritten">
+        UPDATE plans SET memory_status = 'WRITTEN' WHERE id = #{planId}
+    </update>
+
+    <select id="findFeed" resultMap="memoryResultMap">
+        SELECT m.id, m.room_id, m.plan_id, m.writer_id, u.nickname AS writer_nickname,
+               u.profile_image_url AS writer_profile_image_url, m.title, m.content, m.memory_date,
+               m.created_at, m.updated_at,
+               (SELECT COUNT(*) FROM memory_comments c WHERE c.memory_id = m.id) AS comment_count,
+               (SELECT GROUP_CONCAT(mt.tag SEPARATOR ',') FROM memory_tags mt WHERE mt.memory_id = m.id) AS tags_csv
+        FROM memories m
+        JOIN users u ON u.id = m.writer_id
+        <where>
+            m.room_id = #{roomId} AND m.deleted_at IS NULL
+            <if test="month != null">AND DATE_FORMAT(m.memory_date, '%Y-%m') = #{month}</if>
+            <if test="writerId != null">AND m.writer_id = #{writerId}</if>
+            <if test="tag != null">AND EXISTS (
+                SELECT 1 FROM memory_tags mt2 WHERE mt2.memory_id = m.id AND mt2.tag = #{tag}
+            )</if>
+            <if test="participantUserId != null">AND EXISTS (
+                SELECT 1 FROM memory_participants mp WHERE mp.memory_id = m.id AND mp.user_id = #{participantUserId}
+            )</if>
+        </where>
+        ORDER BY m.memory_date DESC, m.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <update id="update">
+        UPDATE memories
+        <set>
+            <if test="request.has('title')">title = #{request.title},</if>
+            <if test="request.has('content')">content = #{request.content},</if>
+            <if test="request.has('memoryDate')">memory_date = #{request.memoryDate},</if>
+        </set>
+        WHERE id = #{memoryId}
+    </update>
+
+    <update id="softDelete">
+        UPDATE memories SET deleted_at = #{deletedAt} WHERE id = #{memoryId}
+    </update>
+
+    <insert id="insertTags">
+        INSERT INTO memory_tags (memory_id, tag) VALUES
+        <foreach collection="tags" item="tag" separator=",">
+            (#{memoryId}, #{tag})
+        </foreach>
+    </insert>
+
+    <delete id="deleteTags">
+        DELETE FROM memory_tags WHERE memory_id = #{memoryId}
+    </delete>
+
+    <select id="findTags" resultType="string">
+        SELECT tag FROM memory_tags WHERE memory_id = #{memoryId} ORDER BY id ASC
+    </select>
+
+    <insert id="insertParticipants">
+        INSERT INTO memory_participants (memory_id, user_id) VALUES
+        <foreach collection="userIds" item="userId" separator=",">
+            (#{memoryId}, #{userId})
+        </foreach>
+    </insert>
+
+    <delete id="deleteParticipants">
+        DELETE FROM memory_participants WHERE memory_id = #{memoryId}
+    </delete>
+
+    <select id="findParticipants" resultMap="participantRowMap">
+        SELECT mp.user_id AS user_id, u.nickname AS nickname, u.profile_image_url AS profile_image_url
+        FROM memory_participants mp
+        JOIN users u ON u.id = mp.user_id
+        WHERE mp.memory_id = #{memoryId}
+        ORDER BY mp.user_id ASC
+    </select>
+</mapper>
