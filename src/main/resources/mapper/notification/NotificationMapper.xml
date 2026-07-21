@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.notification.mapper.NotificationMapper">
+
+    <resultMap id="notificationResultMap" type="com.korit.clovapi.domain.notification.entity.Notification">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="recipientId" column="recipient_id"/>
+        <result property="actorId" column="actor_id"/>
+        <result property="type" column="type"/>
+        <result property="referenceId" column="reference_id"/>
+        <result property="isRead" column="is_read"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="getNotifications" resultMap="notificationResultMap">
+        SELECT id, room_id, recipient_id, actor_id, type, reference_id, is_read, created_at
+        FROM notifications
+        WHERE room_id = #{roomId}
+          AND recipient_id = #{recipientId}
+        <if test="type != null">
+          AND type = #{type}
+        </if>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findById" resultMap="notificationResultMap">
+        SELECT id, room_id, recipient_id, actor_id, type, reference_id, is_read, created_at
+        FROM notifications
+        WHERE id = #{id}
+    </select>
+
+    <update id="markAsRead">
+        UPDATE notifications
+        SET is_read = true
+        WHERE id = #{id}
+    </update>
+
+    <update id="markAllAsRead">
+        UPDATE notifications
+        SET is_read = true
+        WHERE room_id = #{roomId}
+          AND recipient_id = #{recipientId}
+          AND is_read = false
+    </update>
+
+    <select id="isRoomMemberActive" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM room_members
+            WHERE room_id = #{roomId}
+              AND user_id = #{userId}
+              AND status = 'ACTIVE'
+        )
+    </select>
+</mapper>
