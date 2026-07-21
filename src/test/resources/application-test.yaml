@@ -18,3 +18,13 @@ spring:
 jwt:
   issuer: clov-api-test
   secret: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+# 더미 R2 설정 — 서명은 로컬 계산이라 네트워크 없이 presign URL 형태를 검증할 수 있다.
+app:
+  storage:
+    endpoint: https://test-account.r2.cloudflarestorage.com
+    region: auto
+    bucket: clov-media
+    access-key: test-access-key-id
+    secret-key: test-secret-access-key
+    public-base-url: https://pub-testhash.r2.dev/
