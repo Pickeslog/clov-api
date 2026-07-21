@@ -120,7 +120,8 @@ public class PlanService {
         checklist.setPlanId(planId);
         checklist.setContent(request.content());
         checklistMapper.insert(checklist);
-        return PlanResponses.Checklist.from(checklist);
+        return PlanResponses.Checklist.from(checklistMapper.findById(checklist.getId())
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
 
     @Transactional

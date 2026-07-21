@@ -1,3 +1,40 @@
 package com.korit.clovapi.domain.plan.mapper;
-import com.korit.clovapi.domain.plan.entity.Plan; import com.korit.clovapi.domain.plan.dto.PlanRequests; import org.apache.ibatis.annotations.*; import java.time.*; import java.util.*;
-@Mapper public interface PlanMapper { void insert(Plan p); Optional<Plan> findById(@Param("planId") long id); List<Plan> findByRoomId(@Param("roomId") long id,@Param("status") String s,@Param("from") LocalDate f,@Param("to") LocalDate t); int updateByIdAndWriterId(@Param("planId") long id,@Param("writerId") long w,@Param("request") PlanRequests.Update r); int deleteByIdAndWriterId(@Param("planId") long id,@Param("writerId") long w); int complete(@Param("planId") long id,@Param("completedAt") LocalDateTime t); int cancelByIdAndWriterId(@Param("planId") long id,@Param("writerId") long w); int skipMemory(@Param("planId") long id); }
+
+import com.korit.clovapi.domain.plan.dto.PlanRequests;
+import com.korit.clovapi.domain.plan.entity.Plan;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Mapper
+public interface PlanMapper {
+
+    void insert(Plan plan);
+
+    Optional<Plan> findById(@Param("planId") long planId);
+
+    List<Plan> findByRoomId(
+            @Param("roomId") long roomId,
+            @Param("status") String status,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to
+    );
+
+    int updateByIdAndWriterId(
+            @Param("planId") long planId,
+            @Param("writerId") long writerId,
+            @Param("request") PlanRequests.Update request
+    );
+
+    int deleteByIdAndWriterId(@Param("planId") long planId, @Param("writerId") long writerId);
+
+    int complete(@Param("planId") long planId, @Param("completedAt") LocalDateTime completedAt);
+
+    int cancelByIdAndWriterId(@Param("planId") long planId, @Param("writerId") long writerId);
+
+    int skipMemory(@Param("planId") long planId);
+}

@@ -1,4 +1,45 @@
 package com.korit.clovapi.domain.plan.entity;
-import java.time.LocalDate; import java.time.LocalDateTime;
-public class Plan { private Long id,roomId,writerId; private String writerNickname,writerProfileImageUrl,title,description,status,memoryStatus; private LocalDate planDate; private LocalDateTime completedAt,createdAt;
- public Long getId(){return id;} public void setId(Long v){id=v;} public Long getRoomId(){return roomId;} public void setRoomId(Long v){roomId=v;} public Long getWriterId(){return writerId;} public void setWriterId(Long v){writerId=v;} public String getWriterNickname(){return writerNickname;} public void setWriterNickname(String v){writerNickname=v;} public String getWriterProfileImageUrl(){return writerProfileImageUrl;} public void setWriterProfileImageUrl(String v){writerProfileImageUrl=v;} public String getTitle(){return title;} public void setTitle(String v){title=v;} public String getDescription(){return description;} public void setDescription(String v){description=v;} public String getStatus(){return status;} public void setStatus(String v){status=v;} public String getMemoryStatus(){return memoryStatus;} public void setMemoryStatus(String v){memoryStatus=v;} public LocalDate getPlanDate(){return planDate;} public void setPlanDate(LocalDate v){planDate=v;} public LocalDateTime getCompletedAt(){return completedAt;} public void setCompletedAt(LocalDateTime v){completedAt=v;} public LocalDateTime getCreatedAt(){return createdAt;} public void setCreatedAt(LocalDateTime v){createdAt=v;} }
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+public class Plan {
+
+    private Long id;
+    private Long roomId;
+    private Long writerId;
+    private String writerNickname;
+    private String writerProfileImageUrl;
+    private String title;
+    private String description;
+    private String status;
+    private String memoryStatus;
+    private LocalDate planDate;
+    private LocalDateTime completedAt;
+    private LocalDateTime createdAt;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Long getRoomId() { return roomId; }
+    public void setRoomId(Long roomId) { this.roomId = roomId; }
+    public Long getWriterId() { return writerId; }
+    public void setWriterId(Long writerId) { this.writerId = writerId; }
+    public String getWriterNickname() { return writerNickname; }
+    public void setWriterNickname(String writerNickname) { this.writerNickname = writerNickname; }
+    public String getWriterProfileImageUrl() { return writerProfileImageUrl; }
+    public void setWriterProfileImageUrl(String writerProfileImageUrl) { this.writerProfileImageUrl = writerProfileImageUrl; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getMemoryStatus() { return memoryStatus; }
+    public void setMemoryStatus(String memoryStatus) { this.memoryStatus = memoryStatus; }
+    public LocalDate getPlanDate() { return planDate; }
+    public void setPlanDate(LocalDate planDate) { this.planDate = planDate; }
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+}
