@@ -1,5 +1,7 @@
 package com.korit.clovapi.domain.letter.dto;
 
+import com.korit.clovapi.global.dto.UserSummaryResponse;
+
 import java.time.LocalDateTime;
 
 public record LetterResponse(
