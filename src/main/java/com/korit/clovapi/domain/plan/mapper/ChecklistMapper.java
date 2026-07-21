@@ -20,4 +20,6 @@ public interface ChecklistMapper {
     int update(@Param("checklistId") long checklistId, @Param("request") PlanRequests.ChecklistUpdate request);
 
     int deleteById(@Param("checklistId") long checklistId);
+
+    void deleteByPlanId(@Param("planId") long planId);
 }

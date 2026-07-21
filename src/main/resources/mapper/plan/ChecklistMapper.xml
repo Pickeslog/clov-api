@@ -42,4 +42,9 @@
         DELETE FROM plan_checklists
         WHERE id = #{checklistId}
     </delete>
+
+    <delete id="deleteByPlanId">
+        DELETE FROM plan_checklists
+        WHERE plan_id = #{planId}
+    </delete>
 </mapper>
