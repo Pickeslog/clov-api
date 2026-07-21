@@ -8,6 +8,8 @@ import com.korit.clovapi.domain.invite.dto.AcceptJoinRequestResponse;
 import com.korit.clovapi.domain.invite.dto.JoinRequestListItemResponse;
 import com.korit.clovapi.domain.invite.dto.JoinRequestsResponse;
 import com.korit.clovapi.domain.invite.dto.JoinRequestResponse;
+import com.korit.clovapi.domain.invite.dto.MyJoinRequestResponse;
+import com.korit.clovapi.domain.invite.dto.MyJoinRequestsResponse;
 import com.korit.clovapi.domain.invite.entity.RoomInvite;
 import com.korit.clovapi.domain.invite.entity.RoomJoinRequest;
 import com.korit.clovapi.domain.invite.mapper.InviteMapper;
@@ -100,6 +102,13 @@ public class InviteService {
         assertActiveMember(roomId, userId);
         return new JoinRequestsResponse(joinRequestMapper.findPendingByRoomId(roomId).stream()
                 .map(JoinRequestListItemResponse::from)
+                .toList());
+    }
+
+    /** 내가 보낸 가입 신청(요청한 방) — PENDING·REJECTED. */
+    public MyJoinRequestsResponse findMyJoinRequests(long userId) {
+        return new MyJoinRequestsResponse(joinRequestMapper.findMineByUserId(userId).stream()
+                .map(MyJoinRequestResponse::from)
                 .toList());
     }
 

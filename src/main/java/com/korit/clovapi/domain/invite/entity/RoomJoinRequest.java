@@ -17,6 +17,9 @@ public class RoomJoinRequest {
     private LocalDateTime undoDeadlineAt;
     private LocalDateTime rejectedAt;
     private Integer version;
+    // 내 신청 목록 전용(방 이름·상태 조인).
+    private String roomName;
+    private String roomStatus;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -44,4 +47,8 @@ public class RoomJoinRequest {
     public void setRejectedAt(LocalDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }
+    public String getRoomName() { return roomName; }
+    public void setRoomName(String roomName) { this.roomName = roomName; }
+    public String getRoomStatus() { return roomStatus; }
+    public void setRoomStatus(String roomStatus) { this.roomStatus = roomStatus; }
 }

@@ -48,6 +48,7 @@ class RoomIntegrationTest extends IntegrationTestSupport {
         for (Long createdRoomId : roomIds) {
             jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", createdRoomId);
             jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", createdRoomId);
+            jdbcTemplate.update("DELETE FROM plans WHERE room_id = ?", createdRoomId);
             jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", createdRoomId);
             jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", createdRoomId);
         }
@@ -88,6 +89,24 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items[0].createdAt").exists())
                 .andExpect(jsonPath("$.data.items[1].id").value(String.valueOf(regularRoomId)))
                 .andExpect(jsonPath("$.data.items[1].isFavorite").value(false));
+    }
+
+    @Test
+    void findMyRoomsIncludesNextScheduledPlan() throws Exception {
+        long tripRoom = createRoom(accessToken, "Trip Room");
+        createRoom(accessToken, "Empty Room");
+        jdbcTemplate.update(
+                "INSERT INTO plans (room_id, writer_id, title, plan_date, status, memory_status) "
+                        + "VALUES (?, ?, '제주 여행', DATE_ADD(CURDATE(), INTERVAL 5 DAY), 'SCHEDULED', 'NONE')",
+                tripRoom, userId);
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.name=='Trip Room')].nextPlan.title",
+                        org.hamcrest.Matchers.hasItem("제주 여행")))
+                .andExpect(jsonPath("$.data.items[?(@.name=='Trip Room')].nextPlan.planDate").exists())
+                // 약속 없는 방은 nextPlan = null → 필터 결과에 title 없음.
+                .andExpect(jsonPath("$.data.items[?(@.name=='Empty Room')].nextPlan.title").isEmpty());
     }
 
     @Test

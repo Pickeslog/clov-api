@@ -18,6 +18,8 @@
         <result property="undoDeadlineAt" column="undo_deadline_at"/>
         <result property="rejectedAt" column="rejected_at"/>
         <result property="version" column="version"/>
+        <result property="roomName" column="room_name"/>
+        <result property="roomStatus" column="room_status"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
@@ -64,4 +66,16 @@
         WHERE id = #{joinRequestId} AND status = 'ACCEPTED' AND version = #{version}
           AND accepted_by = #{acceptedBy}
     </update>
+
+    <select id="findMineByUserId" resultMap="roomJoinRequestResultMap">
+        SELECT jr.id, jr.room_id, jr.user_id, jr.invite_id, jr.status, jr.accepted_by, jr.requested_at,
+               jr.accepted_at, jr.undo_deadline_at, jr.rejected_at, jr.version,
+               u.nickname, u.profile_image_url,
+               fr.name AS room_name, fr.status AS room_status
+        FROM room_join_requests jr
+        JOIN users u ON u.id = jr.user_id
+        JOIN friendship_rooms fr ON fr.id = jr.room_id
+        WHERE jr.user_id = #{userId} AND jr.status IN ('PENDING', 'REJECTED')
+        ORDER BY jr.requested_at DESC
+    </select>
 </mapper>

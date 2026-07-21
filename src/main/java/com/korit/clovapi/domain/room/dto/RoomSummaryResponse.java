@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.room.dto;
 
 import com.korit.clovapi.domain.room.entity.Room;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record RoomSummaryResponse(
@@ -15,9 +16,16 @@ public record RoomSummaryResponse(
         Integer memberCount,
         Boolean isFavorite,
         String status,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        NextPlan nextPlan
 ) {
+    public record NextPlan(String title, LocalDate planDate) {
+    }
+
     public static RoomSummaryResponse from(Room room) {
+        NextPlan nextPlan = room.getNextPlanDate() != null
+                ? new NextPlan(room.getNextPlanTitle(), room.getNextPlanDate())
+                : null;
         return new RoomSummaryResponse(
                 String.valueOf(room.getId()),
                 room.getName(),
@@ -29,7 +37,8 @@ public record RoomSummaryResponse(
                 room.getMemberCount(),
                 room.getFavorite(),
                 room.getStatus(),
-                room.getCreatedAt()
+                room.getCreatedAt(),
+                nextPlan
         );
     }
 }
