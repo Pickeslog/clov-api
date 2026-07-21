@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.korit.clovapi.domain.invite.mapper.InviteMapper">
+
+    <resultMap id="roomInviteResultMap" type="com.korit.clovapi.domain.invite.entity.RoomInvite">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="inviteCode" column="invite_code"/>
+        <result property="status" column="status"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO room_invites (room_id, created_by, invite_code, expires_at)
+        VALUES (#{roomId}, #{createdBy}, #{inviteCode}, #{expiresAt})
+    </insert>
+
+    <select id="existsByInviteCode" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM room_invites WHERE invite_code = #{inviteCode})
+    </select>
+
+    <select id="findById" resultMap="roomInviteResultMap">
+        SELECT id, room_id, created_by, invite_code, status, expires_at, created_at
+        FROM room_invites WHERE id = #{inviteId}
+    </select>
+
+    <select id="findByInviteCode" resultMap="roomInviteResultMap">
+        SELECT id, room_id, created_by, invite_code, status, expires_at, created_at
+        FROM room_invites WHERE invite_code = #{inviteCode}
+    </select>
+
+    <select id="findByRoomId" resultMap="roomInviteResultMap">
+        SELECT id, room_id, created_by, invite_code, status, expires_at, created_at
+        FROM room_invites WHERE room_id = #{roomId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <update id="cancelByIdAndCreatorId">
+        UPDATE room_invites SET status = 'CANCELED'
+        WHERE id = #{inviteId} AND created_by = #{createdBy} AND status = 'ACTIVE'
+    </update>
+
+    <update id="markUsedIfActive">
+        UPDATE room_invites SET status = 'USED', used_at = #{usedAt}
+        WHERE id = #{inviteId} AND status = 'ACTIVE'
+    </update>
+
+    <insert id="insertJoinNotifications">
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type, reference_id)
+        SELECT #{roomId}, user_id, #{actorId}, 'JOIN', #{referenceId}
+        FROM room_members
+        WHERE room_id = #{roomId} AND status = 'ACTIVE'
+    </insert>
+</mapper>

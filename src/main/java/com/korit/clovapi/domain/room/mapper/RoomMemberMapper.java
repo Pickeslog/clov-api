@@ -21,6 +21,10 @@ public interface RoomMemberMapper {
 
     int countActiveByRoomId(@Param("roomId") long roomId);
 
+    int countActiveForUpdateByRoomId(@Param("roomId") long roomId);
+
+    int deleteByRoomIdAndUserId(@Param("roomId") long roomId, @Param("userId") long userId);
+
     void updateStatusMessage(@Param("roomId") long roomId, @Param("userId") long userId,
                              @Param("statusMessage") String statusMessage);
 
