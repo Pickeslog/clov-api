@@ -30,24 +30,6 @@
         <result property="favorite" column="is_favorite"/>
     </resultMap>
 
-    <select id="isActiveRoomMember" resultType="boolean">
-        SELECT EXISTS(
-            SELECT 1
-            FROM room_members
-            WHERE room_id = #{roomId}
-              AND user_id = #{userId}
-              AND status = 'ACTIVE'
-        )
-    </select>
-
-    <select id="findActiveMemberUserIds" resultType="long">
-        SELECT user_id
-        FROM room_members
-        WHERE room_id = #{roomId}
-          AND status = 'ACTIVE'
-          AND user_id != #{excludeUserId}
-    </select>
-
     <insert id="insert" parameterType="com.korit.clovapi.domain.letter.entity.LuckyLetter"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO lucky_letters (room_id, sender_id, receiver_id, content, emoji, sent_at)
