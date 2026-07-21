@@ -1,6 +1,7 @@
 package com.korit.clovapi.domain.notification.controller;
 
-import com.korit.clovapi.domain.notification.dto.NotificationResponse;
+import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
+import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
 import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.global.response.ApiResponse;
 import org.springframework.security.core.Authentication;
@@ -10,7 +11,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -23,7 +23,7 @@ public class NotificationController {
     }
 
     @GetMapping("/rooms/{roomId}/notifications")
-    public ApiResponse<List<NotificationResponse>> getNotifications(
+    public ApiResponse<NotificationsResponse> getNotifications(
             @PathVariable Long roomId,
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
@@ -45,12 +45,11 @@ public class NotificationController {
     }
 
     @PatchMapping("/rooms/{roomId}/notifications/read-all")
-    public ApiResponse<Void> markAllAsRead(
+    public ApiResponse<ReadAllResponse> markAllAsRead(
             @PathVariable Long roomId,
             Authentication authentication
     ) {
         Long requesterId = (Long) authentication.getPrincipal();
-        notificationService.markAllAsRead(roomId, requesterId);
-        return ApiResponse.success(null);
+        return ApiResponse.success(notificationService.markAllAsRead(roomId, requesterId));
     }
 }

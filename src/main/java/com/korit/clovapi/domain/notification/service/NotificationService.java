@@ -1,6 +1,8 @@
 package com.korit.clovapi.domain.notification.service;
 
 import com.korit.clovapi.domain.notification.dto.NotificationResponse;
+import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
+import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
 import com.korit.clovapi.domain.notification.entity.Notification;
 import com.korit.clovapi.domain.notification.mapper.NotificationMapper;
 import com.korit.clovapi.domain.room.service.RoomService;
@@ -22,14 +24,15 @@ public class NotificationService {
         this.roomService = roomService;
     }
 
-    public List<NotificationResponse> getNotifications(Long roomId, Long requesterId, String type, int page, int size) {
+    public NotificationsResponse getNotifications(Long roomId, Long requesterId, String type, int page, int size) {
         roomService.assertActiveMember(roomId, requesterId);
-        
+
         int offset = page * size;
-        return notificationMapper.getNotifications(roomId, requesterId, type, offset, size)
+        List<NotificationResponse> items = notificationMapper.getNotifications(roomId, requesterId, type, offset, size)
                 .stream()
                 .map(NotificationResponse::from)
                 .collect(Collectors.toList());
+        return new NotificationsResponse(items);
     }
 
     @Transactional
@@ -45,9 +48,10 @@ public class NotificationService {
     }
 
     @Transactional
-    public void markAllAsRead(Long roomId, Long requesterId) {
+    public ReadAllResponse markAllAsRead(Long roomId, Long requesterId) {
         roomService.assertActiveMember(roomId, requesterId);
-        
-        notificationMapper.markAllAsRead(roomId, requesterId);
+
+        int updatedCount = notificationMapper.markAllAsRead(roomId, requesterId);
+        return new ReadAllResponse(updatedCount);
     }
 }
