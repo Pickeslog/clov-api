@@ -59,14 +59,16 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications")
                         .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items.length()").value(2));
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].actor.nickname").value("member"));
 
         // With type filter
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications?type=NOTICE")
                         .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.length()").value(1))
-                .andExpect(jsonPath("$.data.items[0].type").value("NOTICE"));
+                .andExpect(jsonPath("$.data.items[0].type").value("NOTICE"))
+                .andExpect(jsonPath("$.data.items[0].actor.nickname").value("member"));
 
         // Non-member approach
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications")
