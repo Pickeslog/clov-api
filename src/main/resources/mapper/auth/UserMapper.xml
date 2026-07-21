@@ -17,25 +17,27 @@
         <result property="privacyAgreedAt" column="privacy_agreed_at"/>
         <result property="marketingAgreedAt" column="marketing_agreed_at"/>
         <result property="personalInviteCode" column="personal_invite_code"/>
+        <result property="anonymized" column="is_anonymized"/>
+        <result property="createdAt" column="created_at"/>
     </resultMap>
 
     <select id="findByEmail" resultMap="userResultMap">
         SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
-               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code, is_anonymized, created_at
         FROM users
         WHERE email = #{email}
     </select>
 
     <select id="findById" resultMap="userResultMap">
         SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
-               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code, is_anonymized, created_at
         FROM users
         WHERE id = #{id}
     </select>
 
     <select id="findByOauth" resultMap="userResultMap">
         SELECT id, email, password, oauth_provider, oauth_subject, nickname, profile_image_url, birthdate,
-               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code
+               terms_agreed_at, privacy_agreed_at, marketing_agreed_at, personal_invite_code, is_anonymized, created_at
         FROM users
         WHERE oauth_provider = #{oauthProvider}
           AND oauth_subject = #{oauthSubject}
@@ -58,4 +60,7 @@
             #{termsAgreedAt}, #{privacyAgreedAt}, #{marketingAgreedAt}, #{personalInviteCode}
         )
     </insert>
+    <update id="updateProfile">UPDATE users <set><if test="request.nickname != null">nickname=#{request.nickname},</if><if test="request.profileImageUrl != null">profile_image_url=#{request.profileImageUrl},</if><if test="request.birthdate != null">birthdate=#{request.birthdate},</if></set> WHERE id=#{userId}</update>
+    <update id="updatePassword">UPDATE users SET password=#{password} WHERE id=#{userId}</update>
+    <update id="anonymize">UPDATE users SET is_anonymized=true,nickname='Unknown',anonymized_at=CURRENT_TIMESTAMP WHERE id=#{userId}</update>
 </mapper>

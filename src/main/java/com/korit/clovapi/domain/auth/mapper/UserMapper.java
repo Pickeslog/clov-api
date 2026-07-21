@@ -1,6 +1,7 @@
 package com.korit.clovapi.domain.auth.mapper;
 
 import com.korit.clovapi.domain.auth.entity.User;
+import com.korit.clovapi.domain.user.dto.UpdateProfileRequest;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -21,4 +22,7 @@ public interface UserMapper {
     boolean existsByPersonalInviteCode(@Param("personalInviteCode") String personalInviteCode);
 
     void insert(User user);
+    int updateProfile(@Param("userId") long userId, @Param("request") UpdateProfileRequest request);
+    int updatePassword(@Param("userId") long userId, @Param("password") String password);
+    int anonymize(@Param("userId") long userId);
 }

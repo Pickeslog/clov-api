@@ -17,6 +17,8 @@ public class User {
     private LocalDateTime privacyAgreedAt;
     private LocalDateTime marketingAgreedAt;
     private String personalInviteCode;
+    private Boolean anonymized;
+    private LocalDateTime createdAt;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -42,4 +44,8 @@ public class User {
     public void setMarketingAgreedAt(LocalDateTime marketingAgreedAt) { this.marketingAgreedAt = marketingAgreedAt; }
     public String getPersonalInviteCode() { return personalInviteCode; }
     public void setPersonalInviteCode(String personalInviteCode) { this.personalInviteCode = personalInviteCode; }
+    public Boolean getAnonymized() { return anonymized; }
+    public void setAnonymized(Boolean anonymized) { this.anonymized = anonymized; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
