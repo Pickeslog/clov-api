@@ -17,6 +17,8 @@ public interface RoomMapper {
 
     Optional<Room> findDetailByIdAndUserId(@Param("roomId") long roomId, @Param("userId") long userId);
 
+    List<Room> findSummariesByMemberUserId(@Param("userId") long userId);
+
     Optional<Room> findById(@Param("roomId") long roomId);
 
     void update(@Param("roomId") long roomId, @Param("request") UpdateRoomRequest request);

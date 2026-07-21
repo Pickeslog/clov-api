@@ -6,6 +6,8 @@ import com.korit.clovapi.domain.room.dto.FavoriteResponse;
 import com.korit.clovapi.domain.room.dto.RoomDetailResponse;
 import com.korit.clovapi.domain.room.dto.RoomMemberResponse;
 import com.korit.clovapi.domain.room.dto.RoomMembersResponse;
+import com.korit.clovapi.domain.room.dto.RoomSummariesResponse;
+import com.korit.clovapi.domain.room.dto.RoomSummaryResponse;
 import com.korit.clovapi.domain.room.dto.StatusMessageRequest;
 import com.korit.clovapi.domain.room.dto.StatusMessageResponse;
 import com.korit.clovapi.domain.room.dto.UpdateRoomRequest;
@@ -54,6 +56,12 @@ public class RoomService {
         assertActiveMember(roomId, userId);
         return RoomDetailResponse.from(roomMapper.findDetailByIdAndUserId(roomId, userId)
                 .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
+    }
+
+    public RoomSummariesResponse findMyRooms(long userId) {
+        return new RoomSummariesResponse(roomMapper.findSummariesByMemberUserId(userId).stream()
+                .map(RoomSummaryResponse::from)
+                .toList());
     }
 
     @Transactional

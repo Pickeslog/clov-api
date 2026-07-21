@@ -5,6 +5,7 @@ import com.korit.clovapi.domain.room.dto.FavoriteRequest;
 import com.korit.clovapi.domain.room.dto.FavoriteResponse;
 import com.korit.clovapi.domain.room.dto.RoomDetailResponse;
 import com.korit.clovapi.domain.room.dto.RoomMembersResponse;
+import com.korit.clovapi.domain.room.dto.RoomSummariesResponse;
 import com.korit.clovapi.domain.room.dto.StatusMessageRequest;
 import com.korit.clovapi.domain.room.dto.StatusMessageResponse;
 import com.korit.clovapi.domain.room.dto.UpdateRoomRequest;
@@ -31,6 +32,11 @@ public class RoomController {
 
     public RoomController(RoomService roomService) {
         this.roomService = roomService;
+    }
+
+    @GetMapping
+    public ApiResponse<RoomSummariesResponse> findMyRooms(Authentication authentication) {
+        return ApiResponse.success(roomService.findMyRooms(currentUserId(authentication)));
     }
 
     @PostMapping

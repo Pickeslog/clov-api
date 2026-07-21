@@ -11,6 +11,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -28,35 +30,101 @@ class RoomIntegrationTest extends IntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private String email;
     private String accessToken;
     private long userId;
     private Long roomId;
+    private final List<Long> roomIds = new ArrayList<>();
+    private final List<Long> userIds = new ArrayList<>();
 
     @BeforeEach
     void setUp() throws Exception {
-        email = "room-it-" + UUID.randomUUID() + "@example.test";
-        MvcResult signup = mockMvc.perform(post("/api/v1/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"" + email + "\",\"password\":\"Abcd1234!\","
-                                + "\"nickname\":\"Room Test\","
-                                + "\"agreements\":{\"service\":true,\"privacy\":true,\"marketing\":false}}"))
-                .andExpect(status().isCreated())
-                .andReturn();
-        accessToken = JsonPath.read(signup.getResponse().getContentAsString(), "$.data.accessToken");
-        userId = Long.parseLong(JsonPath.read(signup.getResponse().getContentAsString(), "$.data.user.id"));
+        AuthUser user = signUp("Room Test");
+        accessToken = user.accessToken();
+        userId = user.userId();
     }
 
     @AfterEach
     void cleanUp() {
-        if (roomId != null) {
-            jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", roomId);
-            jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", roomId);
-            jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
-            jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
+        for (Long createdRoomId : roomIds) {
+            jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", createdRoomId);
+            jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", createdRoomId);
+            jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", createdRoomId);
+            jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", createdRoomId);
         }
-        jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", userId);
-        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+        for (Long createdUserId : userIds) {
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", createdUserId);
+            jdbcTemplate.update("DELETE FROM users WHERE id = ?", createdUserId);
+        }
+    }
+
+    @Test
+    void findMyRoomsReturnsOnlyActiveMembershipsInFavoriteOrder() throws Exception {
+        long regularRoomId = createRoom(accessToken, "Regular Room");
+        long favoriteRoomId = createRoom(accessToken, "Favorite Room");
+
+        mockMvc.perform(patch("/api/v1/rooms/{roomId}/favorite", favoriteRoomId)
+                        .header("Authorization", bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isFavorite\":true}"))
+                .andExpect(status().isOk());
+
+        AuthUser otherUser = signUp("Other Room Test");
+        createRoom(otherUser.accessToken(), "Non Member Room");
+        long leftMemberRoomId = createRoom(otherUser.accessToken(), "Left Member Room");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'LEFT')",
+                leftMemberRoomId, userId);
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(favoriteRoomId)))
+                .andExpect(jsonPath("$.data.items[0].name").value("Favorite Room"))
+                .andExpect(jsonPath("$.data.items[0].themeColor").value("#7CC6A6"))
+                .andExpect(jsonPath("$.data.items[0].coverPhotoUrl").value("https://example.test/cover.jpg"))
+                .andExpect(jsonPath("$.data.items[0].friendshipLevel").value(1))
+                .andExpect(jsonPath("$.data.items[0].memberCount").value(1))
+                .andExpect(jsonPath("$.data.items[0].isFavorite").value(true))
+                .andExpect(jsonPath("$.data.items[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.items[0].createdAt").exists())
+                .andExpect(jsonPath("$.data.items[1].id").value(String.valueOf(regularRoomId)))
+                .andExpect(jsonPath("$.data.items[1].isFavorite").value(false));
+    }
+
+    @Test
+    void findMyRoomsReturnsAnEmptyItemsArrayWhenTheUserHasNoActiveRooms() throws Exception {
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    private AuthUser signUp(String nickname) throws Exception {
+        String email = "room-it-" + UUID.randomUUID() + "@example.test";
+        MvcResult signup = mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"Abcd1234!\","
+                                + "\"nickname\":\"" + nickname + "\","
+                                + "\"agreements\":{\"service\":true,\"privacy\":true,\"marketing\":false}}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String token = JsonPath.read(signup.getResponse().getContentAsString(), "$.data.accessToken");
+        long createdUserId = Long.parseLong(JsonPath.read(signup.getResponse().getContentAsString(), "$.data.user.id"));
+        userIds.add(createdUserId);
+        return new AuthUser(createdUserId, token);
+    }
+
+    private long createRoom(String token, String name) throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + name + "\",\"description\":\"Prepare together\","
+                                + "\"themeColor\":\"#7CC6A6\",\"transportType\":\"airplane\","
+                                + "\"coverPhotoUrl\":\"https://example.test/cover.jpg\",\"coverTitle\":\"Room\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long createdRoomId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+        roomIds.add(createdRoomId);
+        return createdRoomId;
     }
 
     @Test
@@ -73,6 +141,7 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.memberCount").value(1))
                 .andReturn();
         roomId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+        roomIds.add(roomId);
 
         mockMvc.perform(get("/api/v1/rooms/{roomId}", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
@@ -142,5 +211,8 @@ class RoomIntegrationTest extends IntegrationTestSupport {
 
     private String bearerToken() {
         return "Bearer " + accessToken;
+    }
+
+    private record AuthUser(long userId, String accessToken) {
     }
 }
