@@ -1,11 +1,16 @@
 package com.korit.clovapi.domain.memory.service;
 
+import com.korit.clovapi.domain.memory.dto.CommentResponse;
+import com.korit.clovapi.domain.memory.dto.CommentsResponse;
+import com.korit.clovapi.domain.memory.dto.CreateCommentRequest;
 import com.korit.clovapi.domain.memory.dto.CreateMemoryRequest;
 import com.korit.clovapi.domain.memory.dto.MemoryDetailResponse;
 import com.korit.clovapi.domain.memory.dto.MemoryFeedResponse;
 import com.korit.clovapi.domain.memory.dto.MemorySummaryResponse;
 import com.korit.clovapi.domain.memory.dto.UpdateMemoryRequest;
 import com.korit.clovapi.domain.memory.entity.Memory;
+import com.korit.clovapi.domain.memory.entity.MemoryComment;
+import com.korit.clovapi.domain.memory.mapper.CommentMapper;
 import com.korit.clovapi.domain.memory.mapper.MemoryMapper;
 import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
 import com.korit.clovapi.domain.room.service.RoomService;
@@ -26,10 +31,12 @@ public class MemoryService {
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;
+    private final CommentMapper commentMapper;
 
-    public MemoryService(MemoryMapper memoryMapper, RoomService roomService) {
+    public MemoryService(MemoryMapper memoryMapper, RoomService roomService, CommentMapper commentMapper) {
         this.memoryMapper = memoryMapper;
         this.roomService = roomService;
+        this.commentMapper = commentMapper;
     }
 
     @Transactional
@@ -111,6 +118,38 @@ public class MemoryService {
         roomService.assertActiveMember(memory.getRoomId(), userId);
         assertWriter(memory, userId);
         memoryMapper.softDelete(memoryId, LocalDateTime.now(ZoneOffset.UTC));
+    }
+
+    @Transactional
+    public CommentResponse createComment(long memoryId, long userId, CreateCommentRequest request) {
+        Memory memory = findExisting(memoryId);
+        roomService.assertActiveMember(memory.getRoomId(), userId);
+
+        MemoryComment comment = new MemoryComment();
+        comment.setMemoryId(memoryId);
+        comment.setWriterId(userId);
+        comment.setContent(request.content());
+        commentMapper.insert(comment);
+        return CommentResponse.from(commentMapper.findById(comment.getId())
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
+    }
+
+    public CommentsResponse findComments(long memoryId, long userId) {
+        Memory memory = findExisting(memoryId);
+        roomService.assertActiveMember(memory.getRoomId(), userId);
+        return new CommentsResponse(commentMapper.findByMemoryId(memoryId).stream()
+                .map(CommentResponse::from)
+                .toList());
+    }
+
+    @Transactional
+    public void deleteComment(long commentId, long userId) {
+        MemoryComment comment = commentMapper.findById(commentId)
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+        if (comment.getWriterId() != userId) {
+            throw new DomainException(ErrorCode.NOT_WRITER);
+        }
+        commentMapper.delete(commentId);
     }
 
     private Memory findExisting(long memoryId) {
