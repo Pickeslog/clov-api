@@ -1,6 +1,7 @@
 package com.korit.clovapi.domain.memory.dto;
 
 import com.korit.clovapi.domain.memory.entity.Memory;
+import com.korit.clovapi.global.dto.UserSummaryResponse;
 
 import java.time.LocalDate;
 import java.util.Arrays;
