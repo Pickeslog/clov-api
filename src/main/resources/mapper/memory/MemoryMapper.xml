@@ -22,6 +22,7 @@
     </resultMap>
 
     <resultMap id="participantRowMap" type="com.korit.clovapi.domain.memory.mapper.ParticipantRow">
+        <result property="memoryId" column="memory_id"/>
         <result property="userId" column="user_id"/>
         <result property="nickname" column="nickname"/>
         <result property="profileImageUrl" column="profile_image_url"/>
@@ -132,5 +133,15 @@
         JOIN users u ON u.id = mp.user_id
         WHERE mp.memory_id = #{memoryId}
         ORDER BY mp.user_id ASC
+    </select>
+
+    <select id="findParticipantsByMemoryIds" resultMap="participantRowMap">
+        SELECT mp.memory_id AS memory_id, mp.user_id AS user_id, u.nickname AS nickname,
+               u.profile_image_url AS profile_image_url
+        FROM memory_participants mp
+        JOIN users u ON u.id = mp.user_id
+        WHERE mp.memory_id IN
+        <foreach item="id" collection="memoryIds" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY mp.memory_id ASC, mp.user_id ASC
     </select>
 </mapper>

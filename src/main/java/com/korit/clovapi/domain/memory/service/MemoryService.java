@@ -16,6 +16,7 @@ import com.korit.clovapi.domain.memory.entity.Memory;
 import com.korit.clovapi.domain.memory.entity.MemoryComment;
 import com.korit.clovapi.domain.memory.entity.MemoryImage;
 import com.korit.clovapi.domain.memory.mapper.CommentMapper;
+import com.korit.clovapi.domain.memory.mapper.MemoryCover;
 import com.korit.clovapi.domain.memory.mapper.MemoryImageMapper;
 import com.korit.clovapi.domain.memory.mapper.MemoryMapper;
 import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
@@ -94,13 +95,24 @@ public class MemoryService {
         int pageSize = size > 0 ? size : DEFAULT_PAGE_SIZE;
         int offset = Math.max(page, 0) * pageSize;
         List<Memory> rows = memoryMapper.findFeed(roomId, month, writerId, tag, participantUserId, pageSize, offset);
-        // 대표 썸네일(각 추억의 첫 이미지)을 한 번의 쿼리로 조회해 매핑(N+1 회피).
-        Map<Long, String> covers = rows.isEmpty()
-                ? Map.of()
-                : memoryImageMapper.findCoverImagesByMemoryIds(rows.stream().map(Memory::getId).toList())
-                        .stream().collect(Collectors.toMap(MemoryImage::getMemoryId, MemoryImage::getImageUrl, (a, b) -> a));
+        if (rows.isEmpty()) {
+            return new MemoryFeedResponse(List.of());
+        }
+        // 대표 이미지·참여자를 memoryIds로 한 번씩만 조회해 매핑(N+1 회피).
+        List<Long> memoryIds = rows.stream().map(Memory::getId).toList();
+        Map<Long, MemoryCover> covers = memoryImageMapper.findCoverInfoByMemoryIds(memoryIds).stream()
+                .collect(Collectors.toMap(MemoryCover::getMemoryId, cover -> cover, (a, b) -> a));
+        Map<Long, List<UserSummaryResponse>> participants = memoryMapper.findParticipantsByMemoryIds(memoryIds).stream()
+                .collect(Collectors.groupingBy(ParticipantRow::getMemoryId,
+                        Collectors.mapping(this::toUserSummary, Collectors.toList())));
         return new MemoryFeedResponse(rows.stream()
-                .map(memory -> MemorySummaryResponse.from(memory, covers.get(memory.getId())))
+                .map(memory -> {
+                    MemoryCover cover = covers.get(memory.getId());
+                    return MemorySummaryResponse.from(memory,
+                            cover == null ? null : cover.getImageUrl(),
+                            cover == null ? 0 : cover.getImageCount(),
+                            participants.getOrDefault(memory.getId(), List.of()));
+                })
                 .toList());
     }
 

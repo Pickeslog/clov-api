@@ -101,7 +101,10 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                         .param("tag", "hiking"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(memoryId)))
-                .andExpect(jsonPath("$.data.items[0].tags[0]").value("hiking"));
+                .andExpect(jsonPath("$.data.items[0].tags[0]").value("hiking"))
+                .andExpect(jsonPath("$.data.items[0].content").value("We got lost"))
+                .andExpect(jsonPath("$.data.items[0].imageCount").value(0))
+                .andExpect(jsonPath("$.data.items[0].participants[0].id").value(String.valueOf(writerId)));
 
         mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
                         .header("Authorization", "Bearer " + writerToken))
@@ -250,7 +253,8 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                         .header("Authorization", "Bearer " + writerToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(memoryId)))
-                .andExpect(jsonPath("$.data.items[0].thumbnailUrl").value("https://cdn.test/cover.jpg"));
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl").value("https://cdn.test/cover.jpg"))
+                .andExpect(jsonPath("$.data.items[0].imageCount").value(2));
     }
 
     @Test

@@ -18,8 +18,8 @@ public interface MemoryImageMapper {
 
     List<MemoryImage> findByMemoryId(@Param("memoryId") long memoryId);
 
-    /** 여러 추억의 대표 이미지(최소 sort_order, 동률은 최소 id)를 한 번에 조회 — 피드 썸네일용(N+1 회피). */
-    List<MemoryImage> findCoverImagesByMemoryIds(@Param("memoryIds") List<Long> memoryIds);
+    /** 여러 추억의 대표 이미지(최소 sort_order, 동률은 최소 id) URL + 총 이미지 수를 한 번에 조회 — 피드 카드용(N+1 회피). */
+    List<MemoryCover> findCoverInfoByMemoryIds(@Param("memoryIds") List<Long> memoryIds);
 
     void deleteById(@Param("imageId") long imageId);
 
