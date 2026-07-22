@@ -44,4 +44,7 @@ public interface MemoryMapper {
     void deleteParticipants(@Param("memoryId") long memoryId);
 
     List<ParticipantRow> findParticipants(@Param("memoryId") long memoryId);
+
+    /** 여러 추억의 참여자를 한 번에 조회 — 피드 카드용(N+1 회피). row.memoryId로 그룹핑. */
+    List<ParticipantRow> findParticipantsByMemoryIds(@Param("memoryIds") List<Long> memoryIds);
 }

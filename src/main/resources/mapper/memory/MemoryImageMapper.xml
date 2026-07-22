@@ -34,11 +34,18 @@
         ORDER BY sort_order ASC, id ASC
     </select>
 
-    <select id="findCoverImagesByMemoryIds" resultMap="memoryImageResultMap">
-        SELECT memory_id, image_url
+    <resultMap id="memoryCoverResultMap" type="com.korit.clovapi.domain.memory.mapper.MemoryCover">
+        <result property="memoryId" column="memory_id"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="imageCount" column="image_count"/>
+    </resultMap>
+
+    <select id="findCoverInfoByMemoryIds" resultMap="memoryCoverResultMap">
+        SELECT memory_id, image_url, image_count
         FROM (
             SELECT memory_id, image_url,
-                   ROW_NUMBER() OVER (PARTITION BY memory_id ORDER BY sort_order ASC, id ASC) AS rn
+                   ROW_NUMBER() OVER (PARTITION BY memory_id ORDER BY sort_order ASC, id ASC) AS rn,
+                   COUNT(*) OVER (PARTITION BY memory_id) AS image_count
             FROM memory_images
             WHERE memory_id IN
             <foreach item="id" collection="memoryIds" open="(" separator="," close=")">#{id}</foreach>
