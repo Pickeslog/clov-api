@@ -133,10 +133,18 @@ public class InviteService {
         if (joinRequestMapper.acceptWithVersion(joinRequestId, request.getVersion(), userId, now, undoDeadlineAt) != 1) {
             throw new DomainException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
         }
-        RoomMember member = new RoomMember();
-        member.setRoomId(request.getRoomId());
-        member.setUserId(request.getUserId());
-        roomMemberMapper.insert(member);
+        // 이미 ACTIVE면 그대로 두고(멱등), 과거 나간(LEFT) 이력이 있으면 부활(revive), 처음이면 insert.
+        // room_members UNIQUE(room_id,user_id) 때문에 "나갔다 재입장"(LEFT 행 잔존) 시 bare insert가
+        // 중복 위반으로 500나던 것을 방지한다.
+        if (roomMemberMapper.findActiveByRoomIdAndUserId(request.getRoomId(), request.getUserId()).isEmpty()
+                && roomMemberMapper.revive(request.getRoomId(), request.getUserId(), now) != 1) {
+            RoomMember fresh = new RoomMember();
+            fresh.setRoomId(request.getRoomId());
+            fresh.setUserId(request.getUserId());
+            roomMemberMapper.insert(fresh);
+        }
+        RoomMember member = roomMemberMapper.findActiveByRoomIdAndUserId(request.getRoomId(), request.getUserId())
+                .orElseThrow(() -> new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND));
         inviteMapper.insertJoinNotifications(request.getRoomId(), userId, joinRequestId);
         return new AcceptJoinRequestResponse(String.valueOf(member.getId()), String.valueOf(request.getRoomId()),
                 String.valueOf(request.getUserId()), undoDeadlineAt);
