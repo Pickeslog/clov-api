@@ -117,6 +117,32 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items.length()").value(0));
     }
 
+    @Test
+    void coverImagePresignReturnsSignedPutUrlForMember() throws Exception {
+        long createdRoomId = createRoom(accessToken, "Cover Room");
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/cover-image/presign", createdRoomId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/png\",\"fileSize\":102400}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.startsWith("https://")))
+                .andExpect(jsonPath("$.data.uploadUrl").value(org.hamcrest.Matchers.containsString("X-Amz-Signature")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.containsString("rooms/" + createdRoomId + "/cover/")))
+                .andExpect(jsonPath("$.data.imageUrl").value(org.hamcrest.Matchers.endsWith(".png")))
+                .andExpect(jsonPath("$.data.expiresIn").value(300));
+    }
+
+    @Test
+    void coverImagePresignRejectsNonMember() throws Exception {
+        long createdRoomId = createRoom(accessToken, "Cover Room");
+        AuthUser outsider = signUp("Outsider");
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/cover-image/presign", createdRoomId)
+                        .header("Authorization", "Bearer " + outsider.accessToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contentType\":\"image/png\",\"fileSize\":102400}"))
+                .andExpect(status().isForbidden());
+    }
+
     private AuthUser signUp(String nickname) throws Exception {
         String email = "room-it-" + UUID.randomUUID() + "@example.test";
         MvcResult signup = mockMvc.perform(post("/api/v1/auth/signup")

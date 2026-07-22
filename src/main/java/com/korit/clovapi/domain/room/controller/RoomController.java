@@ -10,6 +10,8 @@ import com.korit.clovapi.domain.room.dto.StatusMessageRequest;
 import com.korit.clovapi.domain.room.dto.StatusMessageResponse;
 import com.korit.clovapi.domain.room.dto.UpdateRoomRequest;
 import com.korit.clovapi.domain.room.service.RoomService;
+import com.korit.clovapi.global.dto.PresignRequest;
+import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -94,6 +96,15 @@ public class RoomController {
     @PostMapping("/{roomId}/revive")
     public ApiResponse<RoomDetailResponse> revive(Authentication authentication, @PathVariable long roomId) {
         return ApiResponse.success(roomService.revive(roomId, currentUserId(authentication)));
+    }
+
+    @PostMapping("/{roomId}/cover-image/presign")
+    public ApiResponse<PresignResponse> presignCoverImage(
+            Authentication authentication,
+            @PathVariable long roomId,
+            @Valid @RequestBody PresignRequest request
+    ) {
+        return ApiResponse.success(roomService.presignCoverImage(roomId, currentUserId(authentication), request));
     }
 
     private long currentUserId(Authentication authentication) {

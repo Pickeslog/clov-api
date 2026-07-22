@@ -15,23 +15,41 @@ import com.korit.clovapi.domain.room.entity.Room;
 import com.korit.clovapi.domain.room.entity.RoomMember;
 import com.korit.clovapi.domain.room.mapper.RoomMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
+import com.korit.clovapi.global.dto.PresignRequest;
+import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
+import com.korit.clovapi.global.storage.StoragePresigner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 @Service
 public class RoomService {
 
     private final RoomMapper roomMapper;
     private final RoomMemberMapper roomMemberMapper;
+    private final StoragePresigner storagePresigner;
 
-    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper) {
+    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper, StoragePresigner storagePresigner) {
         this.roomMapper = roomMapper;
         this.roomMemberMapper = roomMemberMapper;
+        this.storagePresigner = storagePresigner;
+    }
+
+    /**
+     * 대표 커버 이미지 업로드용 presigned PUT URL 발급(공간 멤버 누구나, 계약 §6·§4-3).
+     * 클라가 uploadUrl로 PUT 후 PATCH /rooms/{id}의 coverPhotoUrl에 imageUrl을 넣어 커밋한다.
+     * 파일 저장/행 생성은 없고 서명만 한다(로컬 계산).
+     */
+    public PresignResponse presignCoverImage(long roomId, long userId, PresignRequest request) {
+        assertActiveMember(roomId, userId);
+        String objectKey = "rooms/%d/cover/%s%s".formatted(
+                roomId, UUID.randomUUID(), StoragePresigner.extensionFor(request.contentType()));
+        return PresignResponse.from(storagePresigner.presignPut(objectKey, request.contentType()));
     }
 
     @Transactional
