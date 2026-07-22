@@ -190,6 +190,26 @@ class InviteIntegrationTest extends IntegrationTestSupport {
                 "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND user_id = ?", Integer.class, otherRoomId, applicantId));
     }
 
+    @Test
+    void acceptRevivesPreviouslyLeftMemberOnRejoin() throws Exception {
+        // 방을 나갔다(room_members에 LEFT 행 잔존) 코드로 재입장 신청 → 수락 시 bare insert가
+        // UNIQUE(room_id,user_id) 위반으로 500나던 것을 revive(LEFT→ACTIVE)로 처리한다.
+        insertLeftMember(roomId, applicantId);
+        long joinRequestId = insertPendingJoinRequest(roomId, applicantId);
+
+        mockMvc.perform(post("/api/v1/join-requests/{id}/accept", joinRequestId).header("Authorization", bearer(hostId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userId").value(String.valueOf(applicantId)));
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND user_id = ? AND status = 'ACTIVE'",
+                Integer.class, roomId, applicantId));
+        // 부활이지 새 insert가 아니므로 (room_id, user_id) 행은 여전히 하나뿐이어야 한다.
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND user_id = ?",
+                Integer.class, roomId, applicantId));
+    }
+
     private String createInvite() throws Exception {
         String response = mockMvc.perform(post("/api/v1/rooms/{roomId}/invites", roomId)
                         .header("Authorization", bearer(hostId))
@@ -221,6 +241,11 @@ class InviteIntegrationTest extends IntegrationTestSupport {
 
     private void insertActiveMember(long targetRoomId, long userId) {
         jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", targetRoomId, userId);
+    }
+
+    private void insertLeftMember(long targetRoomId, long userId) {
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status, left_at) VALUES (?, ?, 'LEFT', ?)",
+                targetRoomId, userId, Timestamp.valueOf(LocalDateTime.now(ZoneOffset.UTC)));
     }
 
     private long insertPendingJoinRequest(long targetRoomId, long userId) {
