@@ -12,13 +12,18 @@ public record MemorySummaryResponse(
         UserSummaryResponse writer, List<String> tags, int commentCount
 ) {
     public static MemorySummaryResponse from(Memory memory) {
+        return from(memory, null);
+    }
+
+    /** thumbnailUrl = 대표 이미지 공개 URL(피드 카드용). 없으면 null → 프론트가 클로버 fallback. */
+    public static MemorySummaryResponse from(Memory memory, String thumbnailUrl) {
         List<String> tags = memory.getTagsCsv() == null || memory.getTagsCsv().isBlank()
                 ? List.of()
                 : Arrays.asList(memory.getTagsCsv().split(","));
         return new MemorySummaryResponse(
                 String.valueOf(memory.getId()),
                 memory.getPlanId() == null ? null : String.valueOf(memory.getPlanId()),
-                memory.getTitle(), memory.getMemoryDate(), null,
+                memory.getTitle(), memory.getMemoryDate(), thumbnailUrl,
                 new UserSummaryResponse(String.valueOf(memory.getWriterId()), memory.getWriterNickname(),
                         memory.getWriterProfileImageUrl()),
                 tags, memory.getCommentCount() == null ? 0 : memory.getCommentCount());

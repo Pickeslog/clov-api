@@ -34,6 +34,18 @@
         ORDER BY sort_order ASC, id ASC
     </select>
 
+    <select id="findCoverImagesByMemoryIds" resultMap="memoryImageResultMap">
+        SELECT memory_id, image_url
+        FROM (
+            SELECT memory_id, image_url,
+                   ROW_NUMBER() OVER (PARTITION BY memory_id ORDER BY sort_order ASC, id ASC) AS rn
+            FROM memory_images
+            WHERE memory_id IN
+            <foreach item="id" collection="memoryIds" open="(" separator="," close=")">#{id}</foreach>
+        ) t
+        WHERE t.rn = 1
+    </select>
+
     <delete id="deleteById">
         DELETE FROM memory_images WHERE id = #{imageId}
     </delete>
