@@ -32,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class MemoryService {
@@ -92,7 +94,14 @@ public class MemoryService {
         int pageSize = size > 0 ? size : DEFAULT_PAGE_SIZE;
         int offset = Math.max(page, 0) * pageSize;
         List<Memory> rows = memoryMapper.findFeed(roomId, month, writerId, tag, participantUserId, pageSize, offset);
-        return new MemoryFeedResponse(rows.stream().map(MemorySummaryResponse::from).toList());
+        // 대표 썸네일(각 추억의 첫 이미지)을 한 번의 쿼리로 조회해 매핑(N+1 회피).
+        Map<Long, String> covers = rows.isEmpty()
+                ? Map.of()
+                : memoryImageMapper.findCoverImagesByMemoryIds(rows.stream().map(Memory::getId).toList())
+                        .stream().collect(Collectors.toMap(MemoryImage::getMemoryId, MemoryImage::getImageUrl, (a, b) -> a));
+        return new MemoryFeedResponse(rows.stream()
+                .map(memory -> MemorySummaryResponse.from(memory, covers.get(memory.getId())))
+                .toList());
     }
 
     public MemoryDetailResponse getDetail(long memoryId, long userId) {

@@ -241,6 +241,19 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void feedThumbnailReflectsCoverImage() throws Exception {
+        long memoryId = createFreeMemory();
+        // 커밋 2장 → 대표(sort_order 0)가 썸네일이 된다.
+        commitImage(memoryId, "https://cdn.test/cover.jpg");
+        commitImage(memoryId, "https://cdn.test/second.jpg");
+        mockMvc.perform(get("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(memoryId)))
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl").value("https://cdn.test/cover.jpg"));
+    }
+
+    @Test
     void imageQuotaReturns507WhenExceeded() throws Exception {
         long memoryId = createFreeMemory();
         for (int i = 0; i < 10; i++) {
