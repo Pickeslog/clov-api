@@ -14,19 +14,20 @@ spring:
           google:
             client-id: ${OAUTH_GOOGLE_CLIENT_ID:}
             client-secret: ${OAUTH_GOOGLE_CLIENT_SECRET:}
-            redirect-uri: http://localhost:8080/login/oauth2/code/google
+            # 배포: APP_OAUTH_REDIRECT_BASE=https://clovlabcalss.store (provider가 돌려보낼 공개 콜백)
+            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/google
             scope: openid, profile, email
           naver:
             client-id: ${OAUTH_NAVER_CLIENT_ID:}
             client-secret: ${OAUTH_NAVER_CLIENT_SECRET:}
-            redirect-uri: http://localhost:8080/login/oauth2/code/naver
+            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/naver
             authorization-grant-type: authorization_code
             client-name: Naver
             scope: name, email
           kakao:
             client-id: ${OAUTH_KAKAO_CLIENT_ID:}
             client-secret: ${OAUTH_KAKAO_CLIENT_SECRET:}
-            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/kakao
             authorization-grant-type: authorization_code
             client-authentication-method: client_secret_post
             client-name: Kakao
@@ -43,11 +44,16 @@ spring:
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
 
+server:
+  # nginx 리버스 프록시 뒤에서 X-Forwarded-Proto/Host를 신뢰(HTTPS 스킴·호스트 인식). OAuth 리다이렉트·보안 쿠키에 필요.
+  forward-headers-strategy: framework
+
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   oauth2:
-    redirect-url: http://localhost:5173/oauth2/redirect
+    # 배포: APP_OAUTH2_REDIRECT_URL=https://clovlabcalss.store/oauth2/redirect (소셜 로그인 후 프론트 복귀)
+    redirect-url: ${APP_OAUTH2_REDIRECT_URL:http://localhost:5173/oauth2/redirect}
   storage:
     # 실제 값은 application-secret.yaml(로컬 전용)에서 주입한다. R2는 region=auto.
     endpoint: ${APP_STORAGE_ENDPOINT:}
