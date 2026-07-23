@@ -14,9 +14,16 @@
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO room_invites (room_id, created_by, invite_code, expires_at)
-        VALUES (#{roomId}, #{createdBy}, #{inviteCode}, #{expiresAt})
+    <!-- A안: 방당 초대 코드는 한 행. 재발급=제자리 회전. room_id UNIQUE 위에서 upsert(첫 생성/회전 원자적). -->
+    <insert id="upsertByRoomId">
+        INSERT INTO room_invites (room_id, created_by, invite_code, status, expires_at)
+        VALUES (#{roomId}, #{createdBy}, #{inviteCode}, 'ACTIVE', #{expiresAt})
+        ON DUPLICATE KEY UPDATE
+            invite_code = VALUES(invite_code),
+            created_by  = VALUES(created_by),
+            status      = 'ACTIVE',
+            expires_at  = VALUES(expires_at),
+            used_at     = NULL
     </insert>
 
     <select id="existsByInviteCode" resultType="boolean">
@@ -33,20 +40,14 @@
         FROM room_invites WHERE invite_code = #{inviteCode}
     </select>
 
-    <select id="findByRoomId" resultMap="roomInviteResultMap">
+    <select id="findActiveByRoomId" resultMap="roomInviteResultMap">
         SELECT id, room_id, created_by, invite_code, status, expires_at, created_at
-        FROM room_invites WHERE room_id = #{roomId}
-        ORDER BY created_at DESC, id DESC
+        FROM room_invites WHERE room_id = #{roomId} AND status = 'ACTIVE'
     </select>
 
     <update id="cancelByIdAndCreatorId">
         UPDATE room_invites SET status = 'CANCELED'
         WHERE id = #{inviteId} AND created_by = #{createdBy} AND status = 'ACTIVE'
-    </update>
-
-    <update id="markUsedIfActive">
-        UPDATE room_invites SET status = 'USED', used_at = #{usedAt}
-        WHERE id = #{inviteId} AND status = 'ACTIVE'
     </update>
 
     <insert id="insertJoinNotifications">

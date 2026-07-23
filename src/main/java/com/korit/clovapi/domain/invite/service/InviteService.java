@@ -51,19 +51,21 @@ public class InviteService {
     public InviteResponse create(long roomId, long userId, CreateInviteRequest request) {
         assertActiveMember(roomId, userId);
         int expiresInHours = request.expiresInHours() == null ? DEFAULT_EXPIRES_IN_HOURS : request.expiresInHours();
-        RoomInvite invite = new RoomInvite();
-        invite.setRoomId(roomId);
-        invite.setCreatedBy(userId);
-        invite.setInviteCode(nextInviteCode());
-        invite.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC).plusHours(expiresInHours));
-        inviteMapper.insert(invite);
-        return InviteResponse.from(inviteMapper.findById(invite.getId())
-                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
+        LocalDateTime expiresAt = LocalDateTime.now(ZoneOffset.UTC).plusHours(expiresInHours);
+        // A안(방당 고정 회전 코드): 방마다 한 행. "재발급"은 새 행 INSERT가 아니라 제자리 회전(upsert).
+        // → USED/CANCELED 행이 누적되지 않는다.
+        inviteMapper.upsertByRoomId(roomId, nextInviteCode(), userId, expiresAt);
+        return InviteResponse.from(activeInvite(roomId));
     }
 
     public InvitesResponse findByRoomId(long roomId, long userId) {
         assertActiveMember(roomId, userId);
-        return new InvitesResponse(inviteMapper.findByRoomId(roomId).stream().map(InviteResponse::from).toList());
+        return new InvitesResponse(inviteMapper.findActiveByRoomId(roomId).stream().map(InviteResponse::from).toList());
+    }
+
+    private RoomInvite activeInvite(long roomId) {
+        return inviteMapper.findActiveByRoomId(roomId).stream().findFirst()
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
     }
 
     @Transactional
@@ -79,14 +81,14 @@ public class InviteService {
         RoomInvite invite = inviteMapper.findByInviteCode(request.inviteCode())
                 .orElseThrow(() -> new DomainException(ErrorCode.INVITE_EXPIRED));
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        if (invite.getExpiresAt() != null && !invite.getExpiresAt().isAfter(now)) {
+        boolean expired = invite.getExpiresAt() != null && !invite.getExpiresAt().isAfter(now);
+        // A안: 초대 코드는 방당 고정·다회용 — 수락해도 USED로 소모하지 않는다(여러 친구가 한 코드로 신청 가능).
+        // 유효하지 않은 코드(취소됨=CANCELED 또는 만료)는 모두 INVITE_EXPIRED로 통일.
+        if (!"ACTIVE".equals(invite.getStatus()) || expired) {
             throw new DomainException(ErrorCode.INVITE_EXPIRED);
         }
         if (roomMemberMapper.findActiveByRoomIdAndUserId(invite.getRoomId(), userId).isPresent()) {
             throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
-        }
-        if (!"ACTIVE".equals(invite.getStatus()) || inviteMapper.markUsedIfActive(invite.getId(), now) != 1) {
-            throw new DomainException(ErrorCode.INVITE_ALREADY_USED);
         }
 
         RoomJoinRequest joinRequest = new RoomJoinRequest();

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -210,6 +212,63 @@ class InviteIntegrationTest extends IntegrationTestSupport {
                 Integer.class, roomId, applicantId));
     }
 
+    @Test
+    void createRotatesCodeInPlaceKeepingOneRowPerRoom() throws Exception {
+        String first = createInvite();
+        String second = createInvite();   // 재발급
+
+        // 방당 1행 — 재발급해도 새 행이 쌓이지 않는다(A안 핵심).
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_invites WHERE room_id = ?", Integer.class, roomId));
+        // 코드는 제자리 회전(값이 바뀜), 상태는 ACTIVE 유지.
+        assertNotEquals(first, second);
+        assertEquals("ACTIVE", jdbcTemplate.queryForObject(
+                "SELECT status FROM room_invites WHERE room_id = ?", String.class, roomId));
+        assertEquals(second, jdbcTemplate.queryForObject(
+                "SELECT invite_code FROM room_invites WHERE room_id = ?", String.class, roomId));
+    }
+
+    @Test
+    void inviteCodeIsMultiUseAcrossApplicants() throws Exception {
+        String code = createInvite();
+        long secondApplicant = createUser("applicant2");
+
+        // 같은 코드로 두 사람이 각각 입장 신청 — 코드가 소모되지 않는다(다회용).
+        acceptWithCode(applicantId, code)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+        acceptWithCode(secondApplicant, code)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        assertEquals("ACTIVE", jdbcTemplate.queryForObject(
+                "SELECT status FROM room_invites WHERE room_id = ?", String.class, roomId));
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_join_requests WHERE room_id = ?", Integer.class, roomId));
+    }
+
+    @Test
+    void canceledCodeIsRejectedThenReCreateReactivatesSameRow() throws Exception {
+        String code = createInvite();
+        long inviteId = jdbcTemplate.queryForObject(
+                "SELECT id FROM room_invites WHERE room_id = ?", Long.class, roomId);
+
+        // 코드 취소(만든 본인=host) → 취소된 코드로는 신청 불가(INVITE_EXPIRED).
+        mockMvc.perform(delete("/api/v1/invites/{id}", inviteId).header("Authorization", bearer(hostId)))
+                .andExpect(status().isOk());
+        acceptWithCode(applicantId, code)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVITE_EXPIRED"));
+
+        // 재발급 → 같은 행이 ACTIVE로 부활(여전히 1행·id 불변), 새 코드로 신청 성공.
+        String newCode = createInvite();
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_invites WHERE room_id = ?", Integer.class, roomId));
+        assertEquals(inviteId, (long) jdbcTemplate.queryForObject(
+                "SELECT id FROM room_invites WHERE room_id = ?", Long.class, roomId));
+        acceptWithCode(applicantId, newCode).andExpect(status().isOk());
+    }
+
     private String createInvite() throws Exception {
         String response = mockMvc.perform(post("/api/v1/rooms/{roomId}/invites", roomId)
                         .header("Authorization", bearer(hostId))
@@ -219,6 +278,13 @@ class InviteIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.id").isString())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(response, "$.data.inviteCode");
+    }
+
+    private ResultActions acceptWithCode(long userId, String inviteCode) throws Exception {
+        return mockMvc.perform(post("/api/v1/invites/accept")
+                .header("Authorization", bearer(userId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"inviteCode\":\"" + inviteCode + "\"}"));
     }
 
     private long createUser(String prefix) {
