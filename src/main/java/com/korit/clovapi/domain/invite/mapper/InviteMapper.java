@@ -11,7 +11,12 @@ import java.util.Optional;
 @Mapper
 public interface InviteMapper {
 
-    void insert(RoomInvite invite);
+    /**
+     * A안(방당 고정 회전 코드): 방마다 초대 코드는 한 행. 재발급은 새 행이 아니라 제자리 회전이다.
+     * room_id UNIQUE 제약 위에서 INSERT ... ON DUPLICATE KEY UPDATE로 첫 생성·회전을 원자적으로 처리.
+     */
+    void upsertByRoomId(@Param("roomId") long roomId, @Param("inviteCode") String inviteCode,
+                        @Param("createdBy") long createdBy, @Param("expiresAt") LocalDateTime expiresAt);
 
     boolean existsByInviteCode(@Param("inviteCode") String inviteCode);
 
@@ -19,11 +24,10 @@ public interface InviteMapper {
 
     Optional<RoomInvite> findByInviteCode(@Param("inviteCode") String inviteCode);
 
-    List<RoomInvite> findByRoomId(@Param("roomId") long roomId);
+    /** 방의 활성 초대 코드(0 또는 1행). */
+    List<RoomInvite> findActiveByRoomId(@Param("roomId") long roomId);
 
     int cancelByIdAndCreatorId(@Param("inviteId") long inviteId, @Param("createdBy") long createdBy);
-
-    int markUsedIfActive(@Param("inviteId") long inviteId, @Param("usedAt") LocalDateTime usedAt);
 
     void insertJoinNotifications(@Param("roomId") long roomId, @Param("actorId") long actorId,
                                  @Param("referenceId") long referenceId);

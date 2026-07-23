@@ -87,13 +87,13 @@ CREATE TABLE room_invites (
   room_id      BIGINT      NOT NULL,
   created_by   BIGINT      NOT NULL COMMENT '이력용, 권한 아님',
   invite_code  VARCHAR(20) NOT NULL,
-  status       VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/USED/EXPIRED/CANCELED',
+  status       VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/CANCELED (A안: 방당 1행·다회용 회전 코드)',
   expires_at   DATETIME    NULL,
   created_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  used_at      DATETIME    NULL,
+  used_at      DATETIME    NULL COMMENT 'A안 이후 미사용(다회용) — 하위호환 위해 컬럼 보존',
   PRIMARY KEY (id),
   UNIQUE KEY uk_room_invites_code (invite_code),
-  KEY idx_room_invites_room (room_id),
+  UNIQUE KEY uk_room_invites_room (room_id),  -- A안: 방당 초대 코드 1행 강제(재발급=제자리 회전)
   CONSTRAINT fk_room_invites_room FOREIGN KEY (room_id) REFERENCES friendship_rooms(id),
   CONSTRAINT fk_room_invites_creator FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
