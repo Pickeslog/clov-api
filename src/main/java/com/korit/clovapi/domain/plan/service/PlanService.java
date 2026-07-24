@@ -9,6 +9,7 @@ import com.korit.clovapi.domain.plan.mapper.ChecklistMapper;
 import com.korit.clovapi.domain.plan.mapper.PlanMapper;
 import com.korit.clovapi.domain.plan.mapper.StagePhotoMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
+import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import com.korit.clovapi.global.storage.StoragePresigner;
@@ -30,20 +31,26 @@ public class PlanService {
 
     private static final List<String> STAGES = List.of("PROPOSAL", "SCHEDULING", "CONFIRMED", "MEETING");
 
+    // 계약 §12 — 약속 등록 +3, 완료 +15.
+    private static final int PLAN_CREATE_EXP = 3;
+    private static final int PLAN_COMPLETE_EXP = 15;
+
     private final PlanMapper planMapper;
     private final ChecklistMapper checklistMapper;
     private final StagePhotoMapper stagePhotoMapper;
     private final RoomMemberMapper roomMemberMapper;
     private final StoragePresigner storagePresigner;
+    private final ExpService expService;
 
     public PlanService(PlanMapper planMapper, ChecklistMapper checklistMapper,
                        StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper,
-                       StoragePresigner storagePresigner) {
+                       StoragePresigner storagePresigner, ExpService expService) {
         this.planMapper = planMapper;
         this.checklistMapper = checklistMapper;
         this.stagePhotoMapper = stagePhotoMapper;
         this.roomMemberMapper = roomMemberMapper;
         this.storagePresigner = storagePresigner;
+        this.expService = expService;
     }
 
     @Transactional
@@ -56,6 +63,7 @@ public class PlanService {
         plan.setPlanDate(request.planDate());
         plan.setDescription(request.description());
         planMapper.insert(plan);
+        expService.grant(roomId, userId, ExpService.ACTION_PLAN_CREATE, PLAN_CREATE_EXP, plan.getId());
         return detail(plan.getId(), userId);
     }
 
@@ -102,6 +110,7 @@ public class PlanService {
         Plan plan = findPlan(planId);
         assertActiveMember(plan.getRoomId(), userId);
         planMapper.complete(planId, LocalDateTime.now(ZoneOffset.UTC));
+        expService.grant(plan.getRoomId(), userId, ExpService.ACTION_PLAN_COMPLETE, PLAN_COMPLETE_EXP, planId);
         return detail(planId, userId);
     }
 

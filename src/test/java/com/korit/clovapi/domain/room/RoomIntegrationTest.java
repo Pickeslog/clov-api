@@ -241,8 +241,10 @@ class RoomIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/api/v1/rooms/{roomId}/level", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.friendshipLevel").value(1))
                 .andExpect(jsonPath("$.data.expPoint").value(6))
-                .andExpect(jsonPath("$.data.remainingToNextLevel").value(494));
+                .andExpect(jsonPath("$.data.expForNextLevel").value(100))
+                .andExpect(jsonPath("$.data.remainingToNextLevel").value(94));
 
         mockMvc.perform(delete("/api/v1/rooms/{roomId}/members/me", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())

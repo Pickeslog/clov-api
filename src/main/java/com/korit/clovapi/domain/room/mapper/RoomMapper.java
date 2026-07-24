@@ -36,5 +36,11 @@ public interface RoomMapper {
 
     void insertExpLog(FriendshipExpLog log);
 
-    void addExp(@Param("roomId") long roomId, @Param("expDelta") int expDelta);
+    Optional<Room> findByIdForUpdate(@Param("roomId") long roomId);
+
+    void updateLevelAndExp(@Param("roomId") long roomId, @Param("friendshipLevel") int friendshipLevel,
+                           @Param("expPoint") int expPoint);
+
+    int sumExpDeltaByReference(@Param("roomId") long roomId, @Param("actionType") String actionType,
+                               @Param("referenceId") long referenceId);
 }
