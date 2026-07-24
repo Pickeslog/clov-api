@@ -74,6 +74,7 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         if (planId != null) {
             jdbcTemplate.update("DELETE FROM plans WHERE id = ?", planId);
         }
+        jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id IN (?, ?)", writerId, otherId);

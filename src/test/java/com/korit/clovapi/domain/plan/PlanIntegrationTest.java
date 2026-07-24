@@ -57,6 +57,7 @@ class PlanIntegrationTest extends IntegrationTestSupport {
             jdbcTemplate.update("DELETE FROM plan_checklists WHERE plan_id = ?", planId);
             jdbcTemplate.update("DELETE FROM plans WHERE id = ?", planId);
         }
+        jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         for (Long createdUserId : userIds) {

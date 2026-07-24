@@ -1,6 +1,7 @@
 package com.korit.clovapi.domain.room;
 
 import com.jayway.jsonpath.JsonPath;
+import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.support.IntegrationTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,14 +35,20 @@ class ExpIntegrationTest extends IntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private ExpService expService;
+
     private String accessToken;
+    private long userId;
     private long roomId;
     private final List<Long> roomIds = new ArrayList<>();
     private final List<Long> userIds = new ArrayList<>();
 
     @BeforeEach
     void setUp() throws Exception {
-        accessToken = signUp("Exp Test").accessToken();
+        AuthUser user = signUp("Exp Test");
+        accessToken = user.accessToken();
+        userId = user.userId();
         roomId = createRoom("Exp Room");
     }
 
@@ -91,11 +98,14 @@ class ExpIntegrationTest extends IntegrationTestSupport {
     void imageCommitGrantsBonusPerImageUpToTen() throws Exception {
         long memoryId = createFreeMemory("사진 보너스 확인"); // +25
 
-        for (int index = 0; index < 12; index++) {
+        // 이미지 쿼터가 추억당 10장이라 API로는 10장까지만 올릴 수 있다.
+        for (int index = 0; index < 10; index++) {
             commitImage(memoryId, index);
         }
+        // 쿼터가 나중에 늘어나도 XP 보너스는 10에서 멈춰야 하므로 상한을 직접 확인한다.
+        expService.grantMemoryImageBonus(roomId, userId, memoryId);
 
-        // 25 + min(12, 10) = 35 → 레벨 1, 진행도 35
+        // 25 + 10 = 35 → 레벨 1, 진행도 35
         assertLevel(1, 35, 65);
         Integer bonusSum = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(SUM(exp_delta), 0) FROM friendship_exp_logs "
