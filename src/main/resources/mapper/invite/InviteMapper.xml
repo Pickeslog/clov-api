@@ -51,8 +51,8 @@
     </update>
 
     <insert id="insertJoinNotifications">
-        INSERT INTO notifications (room_id, recipient_id, actor_id, type, reference_id)
-        SELECT #{roomId}, user_id, #{actorId}, 'JOIN', #{referenceId}
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type, sub_type, reference_id)
+        SELECT #{roomId}, user_id, #{actorId}, 'JOIN', 'JOIN_REQUEST', #{referenceId}
         FROM room_members
         WHERE room_id = #{roomId} AND status = 'ACTIVE'
     </insert>

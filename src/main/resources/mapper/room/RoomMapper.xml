@@ -92,11 +92,12 @@
         WHERE id = #{roomId}
     </update>
 
+    <!-- 방 설정 변경은 친구 활동이므로 FRIEND 탭(계약 §13, 2026-07-24 NOTICE→FRIEND 이동). 수정자 본인은 제외. -->
     <insert id="insertRoomUpdateNotifications">
-        INSERT INTO notifications (room_id, recipient_id, actor_id, type)
-        SELECT #{roomId}, user_id, #{actorId}, 'NOTICE'
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type, sub_type, reference_id)
+        SELECT #{roomId}, user_id, #{actorId}, 'FRIEND', 'ROOM_UPDATE', #{roomId}
         FROM room_members
-        WHERE room_id = #{roomId} AND status = 'ACTIVE'
+        WHERE room_id = #{roomId} AND status = 'ACTIVE' AND user_id != #{actorId}
     </insert>
 
     <update id="updateStatusInactive">

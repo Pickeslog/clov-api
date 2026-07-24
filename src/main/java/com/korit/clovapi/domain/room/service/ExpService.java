@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.room.service;
 
 import com.korit.clovapi.domain.room.entity.FriendshipExpLog;
 import com.korit.clovapi.domain.room.entity.Room;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.mapper.RoomMapper;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
@@ -40,9 +41,11 @@ public class ExpService {
     public static final int MEMORY_IMAGE_BONUS_MAX = 10;
 
     private final RoomMapper roomMapper;
+    private final NotificationService notificationService;
 
-    public ExpService(RoomMapper roomMapper) {
+    public ExpService(RoomMapper roomMapper, NotificationService notificationService) {
         this.roomMapper = roomMapper;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -74,6 +77,7 @@ public class ExpService {
         log.setReferenceId(referenceId);
         roomMapper.insertExpLog(log);
 
+        int startLevel = level;
         int exp = (room.getExpPoint() == null ? 0 : room.getExpPoint()) + expDelta;
         // 한 번에 큰 XP가 들어와 100을 여러 번 넘기면 넘긴 만큼 연속으로 올린다.
         while (exp >= EXP_PER_LEVEL && level < MAX_LEVEL) {
@@ -85,6 +89,13 @@ public class ExpService {
             exp = 0; // 만렙은 진행도를 남기지 않는다.
         }
         roomMapper.updateLevelAndExp(roomId, level, exp);
+
+        // 레벨이 실제로 올랐을 때만 방 전체에 알림(계약 §13). 연속 레벨업이어도 최종 레벨 하나만.
+        // actor=null(방 전체 이벤트), payload.level=도달 레벨.
+        if (level > startLevel) {
+            notificationService.fanOut(roomId, null, NotificationService.TYPE_FRIEND,
+                    NotificationService.SUB_LEVEL_UP, roomId, "{\"level\":" + level + "}");
+        }
     }
 
     /**

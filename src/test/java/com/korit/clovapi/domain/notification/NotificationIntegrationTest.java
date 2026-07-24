@@ -143,9 +143,11 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
     }
 
     private long insertNotification(long roomId, long recipientId, String type) {
+        // sub_type은 NOT NULL(계약 §13). 필터 테스트라 type에 맞는 임의 유효값이면 충분하다.
+        String subType = "NOTICE".equals(type) ? "ADMIN_NOTICE" : "ROOM_UPDATE";
         jdbcTemplate.update(
-                "INSERT INTO notifications (room_id, recipient_id, actor_id, type, reference_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, false, NOW())",
-                roomId, recipientId, recipientId, type, (Long) null
+                "INSERT INTO notifications (room_id, recipient_id, actor_id, type, sub_type, reference_id, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, false, NOW())",
+                roomId, recipientId, recipientId, type, subType, (Long) null
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }

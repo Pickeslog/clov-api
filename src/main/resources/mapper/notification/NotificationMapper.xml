@@ -12,13 +12,15 @@
         <result property="actorNickname" column="actor_nickname"/>
         <result property="actorProfileImageUrl" column="actor_profile_image_url"/>
         <result property="type" column="type"/>
+        <result property="subType" column="sub_type"/>
         <result property="referenceId" column="reference_id"/>
+        <result property="payload" column="payload"/>
         <result property="isRead" column="is_read"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
     <select id="getNotifications" resultMap="notificationResultMap">
-        SELECT n.id, n.room_id, n.recipient_id, n.actor_id, u.nickname AS actor_nickname, u.profile_image_url AS actor_profile_image_url, n.type, n.reference_id, n.is_read, n.created_at
+        SELECT n.id, n.room_id, n.recipient_id, n.actor_id, u.nickname AS actor_nickname, u.profile_image_url AS actor_profile_image_url, n.type, n.sub_type, n.reference_id, n.payload, n.is_read, n.created_at
         FROM notifications n
         LEFT JOIN users u ON u.id = n.actor_id
         WHERE n.room_id = #{roomId}
@@ -31,11 +33,26 @@
     </select>
 
     <select id="findById" resultMap="notificationResultMap">
-        SELECT n.id, n.room_id, n.recipient_id, n.actor_id, u.nickname AS actor_nickname, u.profile_image_url AS actor_profile_image_url, n.type, n.reference_id, n.is_read, n.created_at
+        SELECT n.id, n.room_id, n.recipient_id, n.actor_id, u.nickname AS actor_nickname, u.profile_image_url AS actor_profile_image_url, n.type, n.sub_type, n.reference_id, n.payload, n.is_read, n.created_at
         FROM notifications n
         LEFT JOIN users u ON u.id = n.actor_id
         WHERE n.id = #{id}
     </select>
+
+    <!-- 팬아웃: 방의 ACTIVE 멤버 전원에게 1행씩. actorId가 있으면 본인은 제외한다(자기 활동은 자기에게 안 알림). -->
+    <insert id="fanOutToActiveMembers">
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type, sub_type, reference_id, payload)
+        SELECT #{roomId}, user_id, #{actorId}, #{type}, #{subType}, #{referenceId}, #{payload}
+        FROM room_members
+        WHERE room_id = #{roomId} AND status = 'ACTIVE'
+          AND (#{actorId} IS NULL OR user_id != #{actorId})
+    </insert>
+
+    <!-- 단건: 특정 수신자에게만(예: 편지 수신). -->
+    <insert id="insertOne">
+        INSERT INTO notifications (room_id, recipient_id, actor_id, type, sub_type, reference_id, payload)
+        VALUES (#{roomId}, #{recipientId}, #{actorId}, #{type}, #{subType}, #{referenceId}, #{payload})
+    </insert>
 
     <update id="markAsRead">
         UPDATE notifications

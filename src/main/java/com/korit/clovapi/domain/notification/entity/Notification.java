@@ -10,7 +10,9 @@ public class Notification {
     private String actorNickname;
     private String actorProfileImageUrl;
     private String type;
+    private String subType;
     private Long referenceId;
+    private String payload;
     private Boolean isRead;
     private LocalDateTime createdAt;
 
@@ -34,9 +36,15 @@ public class Notification {
     
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
-    
+
+    public String getSubType() { return subType; }
+    public void setSubType(String subType) { this.subType = subType; }
+
     public Long getReferenceId() { return referenceId; }
     public void setReferenceId(Long referenceId) { this.referenceId = referenceId; }
+
+    public String getPayload() { return payload; }
+    public void setPayload(String payload) { this.payload = payload; }
     
     public Boolean getIsRead() { return isRead; }
     public void setIsRead(Boolean isRead) { this.isRead = isRead; }
