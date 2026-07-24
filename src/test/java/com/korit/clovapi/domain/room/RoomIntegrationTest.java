@@ -199,7 +199,9 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.description").value("Updated"))
                 .andExpect(jsonPath("$.data.coverPhotoUrl").doesNotExist());
-        org.junit.jupiter.api.Assertions.assertEquals(1,
+        // 방 수정 알림은 수정자 본인을 제외한 ACTIVE 멤버에게만 간다(계약 §13, FRIEND/ROOM_UPDATE).
+        // 이 방은 멤버가 수정자 한 명뿐이라 알림이 생기지 않는다. (팬아웃+본인제외 검증은 NotificationFanOutIntegrationTest)
+        org.junit.jupiter.api.Assertions.assertEquals(0,
                 jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, roomId));
 
         mockMvc.perform(get("/api/v1/rooms/{roomId}/members", roomId).header("Authorization", bearerToken()))

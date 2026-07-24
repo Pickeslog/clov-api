@@ -67,6 +67,7 @@ class CommentIntegrationTest extends IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM memory_comments WHERE memory_id = ?", memoryId);
         jdbcTemplate.update("DELETE FROM memories WHERE id = ?", memoryId);
         jdbcTemplate.update("DELETE FROM friendship_exp_logs WHERE room_id = ?", roomId);
+        jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id IN (?, ?)", writerId, otherId);

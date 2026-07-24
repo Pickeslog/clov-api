@@ -9,6 +9,7 @@ import com.korit.clovapi.domain.plan.mapper.ChecklistMapper;
 import com.korit.clovapi.domain.plan.mapper.PlanMapper;
 import com.korit.clovapi.domain.plan.mapper.StagePhotoMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
@@ -41,16 +42,19 @@ public class PlanService {
     private final RoomMemberMapper roomMemberMapper;
     private final StoragePresigner storagePresigner;
     private final ExpService expService;
+    private final NotificationService notificationService;
 
     public PlanService(PlanMapper planMapper, ChecklistMapper checklistMapper,
                        StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper,
-                       StoragePresigner storagePresigner, ExpService expService) {
+                       StoragePresigner storagePresigner, ExpService expService,
+                       NotificationService notificationService) {
         this.planMapper = planMapper;
         this.checklistMapper = checklistMapper;
         this.stagePhotoMapper = stagePhotoMapper;
         this.roomMemberMapper = roomMemberMapper;
         this.storagePresigner = storagePresigner;
         this.expService = expService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -64,6 +68,8 @@ public class PlanService {
         plan.setDescription(request.description());
         planMapper.insert(plan);
         expService.grant(roomId, userId, ExpService.ACTION_PLAN_CREATE, PLAN_CREATE_EXP, plan.getId());
+        notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
+                NotificationService.SUB_PLAN_CREATE, plan.getId(), null);
         return detail(plan.getId(), userId);
     }
 
@@ -111,6 +117,8 @@ public class PlanService {
         assertActiveMember(plan.getRoomId(), userId);
         planMapper.complete(planId, LocalDateTime.now(ZoneOffset.UTC));
         expService.grant(plan.getRoomId(), userId, ExpService.ACTION_PLAN_COMPLETE, PLAN_COMPLETE_EXP, planId);
+        notificationService.fanOut(plan.getRoomId(), userId, NotificationService.TYPE_FRIEND,
+                NotificationService.SUB_PLAN_COMPLETE, planId, null);
         return detail(planId, userId);
     }
 

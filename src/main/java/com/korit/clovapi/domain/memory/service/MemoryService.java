@@ -20,6 +20,7 @@ import com.korit.clovapi.domain.memory.mapper.MemoryCover;
 import com.korit.clovapi.domain.memory.mapper.MemoryImageMapper;
 import com.korit.clovapi.domain.memory.mapper.MemoryMapper;
 import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.domain.room.service.RoomService;
 import com.korit.clovapi.global.dto.PresignRequest;
@@ -51,16 +52,18 @@ public class MemoryService {
     private final MemoryImageMapper memoryImageMapper;
     private final StoragePresigner storagePresigner;
     private final ExpService expService;
+    private final NotificationService notificationService;
 
     public MemoryService(MemoryMapper memoryMapper, RoomService roomService, CommentMapper commentMapper,
                          MemoryImageMapper memoryImageMapper, StoragePresigner storagePresigner,
-                         ExpService expService) {
+                         ExpService expService, NotificationService notificationService) {
         this.memoryMapper = memoryMapper;
         this.roomService = roomService;
         this.commentMapper = commentMapper;
         this.memoryImageMapper = memoryImageMapper;
         this.storagePresigner = storagePresigner;
         this.expService = expService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -82,6 +85,8 @@ public class MemoryService {
         memoryMapper.updatePlanMemoryStatusWritten(planId);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
+                NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
         return getDetail(memory.getId(), userId);
     }
 
@@ -94,6 +99,8 @@ public class MemoryService {
         saveTagsAndParticipants(memory.getId(), request);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
+                NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
         return getDetail(memory.getId(), userId);
     }
 
