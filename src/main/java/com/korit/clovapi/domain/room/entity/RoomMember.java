@@ -14,6 +14,7 @@ public class RoomMember {
     private String statusMessage;
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
+    private String birthMonthDay;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -35,4 +36,6 @@ public class RoomMember {
     public void setJoinedAt(LocalDateTime joinedAt) { this.joinedAt = joinedAt; }
     public LocalDateTime getLeftAt() { return leftAt; }
     public void setLeftAt(LocalDateTime leftAt) { this.leftAt = leftAt; }
+    public String getBirthMonthDay() { return birthMonthDay; }
+    public void setBirthMonthDay(String birthMonthDay) { this.birthMonthDay = birthMonthDay; }
 }
