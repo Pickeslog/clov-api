@@ -28,7 +28,8 @@
         <if test="type != null">
           AND n.type = #{type}
         </if>
-        ORDER BY n.created_at DESC
+        <!-- created_at은 초 단위라 같은 초 알림(예: 약속완료+레벨업)은 순서가 불확정 → id로 타이브레이크. -->
+        ORDER BY n.created_at DESC, n.id DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
