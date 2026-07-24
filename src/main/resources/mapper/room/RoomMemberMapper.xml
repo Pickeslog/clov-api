@@ -15,6 +15,7 @@
         <result property="statusMessage" column="status_message"/>
         <result property="joinedAt" column="joined_at"/>
         <result property="leftAt" column="left_at"/>
+        <result property="birthMonthDay" column="birth_month_day"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
@@ -28,9 +29,11 @@
         WHERE room_id = #{roomId} AND user_id = #{userId} AND status = 'ACTIVE'
     </select>
 
+    <!-- 익명화(탈퇴) 계정은 anonymize()가 nickname만 지우고 birthdate는 남기므로, birth_month_day에서 명시적으로 숨긴다. -->
     <select id="findByRoomId" resultMap="roomMemberResultMap">
         SELECT m.id, m.room_id, m.user_id, u.nickname, u.profile_image_url, m.status,
-               m.is_favorite, m.status_message, m.joined_at, m.left_at
+               m.is_favorite, m.status_message, m.joined_at, m.left_at,
+               CASE WHEN u.is_anonymized THEN NULL ELSE DATE_FORMAT(u.birthdate, '%m-%d') END AS birth_month_day
         FROM room_members m
         JOIN users u ON u.id = m.user_id
         WHERE m.room_id = #{roomId}

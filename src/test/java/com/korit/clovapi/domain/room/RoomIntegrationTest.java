@@ -256,6 +256,37 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.scheduledDeleteAt").doesNotExist());
     }
 
+    @Test
+    void membersResponseExposesZeroPaddedBirthMonthDayAndNullWhenMissing() throws Exception {
+        long localRoomId = createRoom(accessToken, "Birthday Room");
+
+        AuthUser withBirthdate = signUp("Birthday Member");
+        jdbcTemplate.update("UPDATE users SET birthdate = ? WHERE id = ?",
+                java.sql.Date.valueOf("2000-01-05"), withBirthdate.userId());
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'ACTIVE')",
+                localRoomId, withBirthdate.userId());
+
+        // 탈퇴(익명화) 계정 — anonymize()는 nickname만 지우고 birthdate는 남기므로, 쿼리가 직접 숨겨야 한다.
+        AuthUser anonymized = signUp("Anonymized Member");
+        jdbcTemplate.update("UPDATE users SET birthdate = ?, is_anonymized = true WHERE id = ?",
+                java.sql.Date.valueOf("1999-12-25"), anonymized.userId());
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'ACTIVE')",
+                localRoomId, anonymized.userId());
+
+        mockMvc.perform(get("/api/v1/rooms/{roomId}/members", localRoomId).header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(3))
+                // room creator never had birthdate set → null, not omitted or NaN
+                .andExpect(jsonPath("$.data.items[?(@.userId=='" + userId + "')].birthMonthDay").value(
+                        org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())))
+                // zero-padded month and day (Jan 5th → "01-05", not "1-5")
+                .andExpect(jsonPath("$.data.items[?(@.userId=='" + withBirthdate.userId() + "')].birthMonthDay").value(
+                        org.hamcrest.Matchers.contains("01-05")))
+                // anonymized account has a birthdate in the DB but must still report null
+                .andExpect(jsonPath("$.data.items[?(@.userId=='" + anonymized.userId() + "')].birthMonthDay").value(
+                        org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+    }
+
     private String bearerToken() {
         return "Bearer " + accessToken;
     }
