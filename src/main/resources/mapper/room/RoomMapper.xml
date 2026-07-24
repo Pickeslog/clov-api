@@ -134,9 +134,27 @@
         VALUES (#{roomId}, #{triggeredBy}, #{actionType}, #{expDelta}, #{referenceId})
     </insert>
 
-    <update id="addExp">
+    <!-- 레벨업 판정은 읽고-쓰기라 경합 시 XP가 유실될 수 있어 행을 잠그고 읽는다. -->
+    <select id="findByIdForUpdate" resultMap="roomResultMap">
+        SELECT id, name, description, theme_color, transport_type, cover_photo_url, cover_title,
+               friendship_level, exp_point, status, scheduled_delete_at, created_at
+        FROM friendship_rooms
+        WHERE id = #{roomId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateLevelAndExp">
         UPDATE friendship_rooms
-        SET exp_point = exp_point + #{expDelta}
+        SET friendship_level = #{friendshipLevel}, exp_point = #{expPoint}
         WHERE id = #{roomId}
     </update>
+
+    <!-- 특정 리소스에 이미 적립된 XP 합(사진 보너스 추억당 상한 판정용). -->
+    <select id="sumExpDeltaByReference" resultType="int">
+        SELECT COALESCE(SUM(exp_delta), 0)
+        FROM friendship_exp_logs
+        WHERE room_id = #{roomId}
+          AND action_type = #{actionType}
+          AND reference_id = #{referenceId}
+    </select>
 </mapper>

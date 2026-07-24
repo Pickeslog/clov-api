@@ -20,6 +20,7 @@ import com.korit.clovapi.domain.memory.mapper.MemoryCover;
 import com.korit.clovapi.domain.memory.mapper.MemoryImageMapper;
 import com.korit.clovapi.domain.memory.mapper.MemoryMapper;
 import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
+import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.domain.room.service.RoomService;
 import com.korit.clovapi.global.dto.PresignRequest;
 import com.korit.clovapi.global.dto.PresignResponse;
@@ -49,14 +50,17 @@ public class MemoryService {
     private final CommentMapper commentMapper;
     private final MemoryImageMapper memoryImageMapper;
     private final StoragePresigner storagePresigner;
+    private final ExpService expService;
 
     public MemoryService(MemoryMapper memoryMapper, RoomService roomService, CommentMapper commentMapper,
-                         MemoryImageMapper memoryImageMapper, StoragePresigner storagePresigner) {
+                         MemoryImageMapper memoryImageMapper, StoragePresigner storagePresigner,
+                         ExpService expService) {
         this.memoryMapper = memoryMapper;
         this.roomService = roomService;
         this.commentMapper = commentMapper;
         this.memoryImageMapper = memoryImageMapper;
         this.storagePresigner = storagePresigner;
+        this.expService = expService;
     }
 
     @Transactional
@@ -76,6 +80,8 @@ public class MemoryService {
         memoryMapper.insert(memory);
         saveTagsAndParticipants(memory.getId(), request);
         memoryMapper.updatePlanMemoryStatusWritten(planId);
+        expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
+                ExpService.memoryWriteExp(request.content()), memory.getId());
         return getDetail(memory.getId(), userId);
     }
 
@@ -86,6 +92,8 @@ public class MemoryService {
         Memory memory = buildMemory(roomId, null, userId, request);
         memoryMapper.insert(memory);
         saveTagsAndParticipants(memory.getId(), request);
+        expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
+                ExpService.memoryWriteExp(request.content()), memory.getId());
         return getDetail(memory.getId(), userId);
     }
 
@@ -155,6 +163,7 @@ public class MemoryService {
         image.setSortOrder(request.sortOrder() != null ? request.sortOrder()
                 : memoryImageMapper.countByMemoryId(memoryId));
         memoryImageMapper.insert(image);
+        expService.grantMemoryImageBonus(memory.getRoomId(), userId, memoryId);
         return MemoryImageResponse.from(memoryImageMapper.findById(image.getId())
                 .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
