@@ -11,6 +11,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -287,6 +291,46 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 // anonymized account has a birthdate in the DB but must still report null
                 .andExpect(jsonPath("$.data.items[?(@.userId=='" + anonymized.userId() + "')].birthMonthDay").value(
                         org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+    }
+
+    // 마스코트 하루 3회 한도의 "하루"는 KST 자정에 리셋된다(#66).
+    // UTC 자정으로 자르면 한국 사용자에게는 오전 9시에 리셋돼, 자정을 넘겨 날짜가 바뀌어도 한도가 그대로 소진 상태로 남는다.
+    @Test
+    void mascotDailyLimitResetsAtKoreaMidnightNotUtcMidnight() throws Exception {
+        long mascotRoomId = createRoom(accessToken, "Mascot Limit Room");
+        // 구현과 별개로 여기서 다시 계산한다 — 기준 지역이 바뀌면 테스트가 알아채야 하기 때문.
+        ZoneId korea = ZoneId.of("Asia/Seoul");
+        LocalDateTime startOfTodayUtc = LocalDate.now(korea).atStartOfDay(korea)
+                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+
+        // 어제(KST) 23:59 — 오늘 창 밖이라 한도에 잡히면 안 된다.
+        insertMascotLog(mascotRoomId, startOfTodayUtc.minusMinutes(1));
+        // 오늘(KST) 00:01·00:02 — UTC 자정으로 자르면 이 둘이 "어제"로 새어나가 한도가 잘못 리셋된다.
+        insertMascotLog(mascotRoomId, startOfTodayUtc.plusMinutes(1));
+        insertMascotLog(mascotRoomId, startOfTodayUtc.plusMinutes(2));
+
+        // 오늘 2회 썼으므로 이번 1회는 성공하고 남은 횟수는 0이어야 한다.
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/mascot/interact", mascotRoomId)
+                        .header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.remainingToday").value(0));
+
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/mascot/interact", mascotRoomId)
+                        .header("Authorization", bearerToken()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error.code").value("MASCOT_INTERACTION_LIMIT_REACHED"));
+    }
+
+    private void insertMascotLog(long targetRoomId, LocalDateTime createdAtUtc) {
+        // created_at은 LocalDateTime 그대로 넘긴다 — Timestamp로 넘기면 드라이버가 JVM 기본 시간대로
+        // 환산해 경계 테스트가 9시간 틀어질 수 있다.
+        jdbcTemplate.update("INSERT INTO friendship_exp_logs (room_id, triggered_by, action_type, exp_delta, created_at)"
+                        + " VALUES (?, ?, 'MASCOT_INTERACT', 2, ?)",
+                targetRoomId, userId, createdAtUtc);
+        // 넣은 값이 환산 없이 그대로 저장됐는지 확인한다. 이게 어긋나면 아래 단언들이 엉뚱한 이유로 실패한다.
+        org.junit.jupiter.api.Assertions.assertEquals(createdAtUtc, jdbcTemplate.queryForObject(
+                "SELECT created_at FROM friendship_exp_logs WHERE room_id = ? ORDER BY id DESC LIMIT 1",
+                LocalDateTime.class, targetRoomId));
     }
 
     private String bearerToken() {
