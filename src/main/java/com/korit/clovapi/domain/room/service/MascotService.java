@@ -6,12 +6,11 @@ import com.korit.clovapi.domain.room.entity.Room;
 import com.korit.clovapi.domain.room.mapper.RoomMapper;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
+import com.korit.clovapi.global.time.ClovTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Service
 public class MascotService {
@@ -42,7 +41,8 @@ public class MascotService {
     @Transactional
     public MascotInteractionResponse interact(long roomId, long userId) {
         roomService.assertActiveMember(roomId, userId);
-        LocalDateTime startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay();
+        // "하루"는 사용자 기준(KST) 자정에 리셋된다 — created_at은 UTC로 저장되므로 경계도 UTC로 환산해 비교한다.
+        LocalDateTime startOfDay = ClovTime.startOfTodayUtc();
         int usedToday = roomMapper.countMascotInteractionsToday(roomId, userId, startOfDay);
         if (usedToday >= DAILY_INTERACTION_LIMIT) {
             throw new DomainException(ErrorCode.MASCOT_INTERACTION_LIMIT_REACHED);
