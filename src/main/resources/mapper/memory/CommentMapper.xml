@@ -27,6 +27,14 @@
         WHERE c.id = #{commentId}
     </select>
 
+    <select id="findByMemoryIdAndWriterId" resultMap="commentResultMap">
+        SELECT c.id, c.memory_id, c.writer_id, u.nickname AS writer_nickname,
+               u.profile_image_url AS writer_profile_image_url, c.content, c.created_at
+        FROM memory_comments c
+        JOIN users u ON u.id = c.writer_id
+        WHERE c.memory_id = #{memoryId} AND c.writer_id = #{writerId}
+    </select>
+
     <select id="findByMemoryId" resultMap="commentResultMap">
         SELECT c.id, c.memory_id, c.writer_id, u.nickname AS writer_nickname,
                u.profile_image_url AS writer_profile_image_url, c.content, c.created_at
@@ -35,6 +43,11 @@
         WHERE c.memory_id = #{memoryId}
         ORDER BY c.created_at ASC, c.id ASC
     </select>
+
+    <!-- updated_at은 컬럼의 ON UPDATE CURRENT_TIMESTAMP가 자동 갱신한다. -->
+    <update id="update">
+        UPDATE memory_comments SET content = #{content} WHERE id = #{commentId}
+    </update>
 
     <delete id="delete">
         DELETE FROM memory_comments WHERE id = #{commentId}

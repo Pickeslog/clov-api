@@ -3,6 +3,7 @@ package com.korit.clovapi.domain.memory.controller;
 import com.korit.clovapi.domain.memory.dto.CommentResponse;
 import com.korit.clovapi.domain.memory.dto.CommentsResponse;
 import com.korit.clovapi.domain.memory.dto.CreateCommentRequest;
+import com.korit.clovapi.domain.memory.dto.UpdateCommentRequest;
 import com.korit.clovapi.domain.memory.service.MemoryService;
 import com.korit.clovapi.global.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,6 +40,15 @@ public class CommentController {
     @GetMapping("/api/v1/memories/{memoryId}/comments")
     public ApiResponse<CommentsResponse> findAll(Authentication authentication, @PathVariable long memoryId) {
         return ApiResponse.success(memoryService.findComments(memoryId, currentUserId(authentication)));
+    }
+
+    @PatchMapping("/api/v1/comments/{commentId}")
+    public ApiResponse<CommentResponse> update(
+            Authentication authentication,
+            @PathVariable long commentId,
+            @Valid @RequestBody UpdateCommentRequest request
+    ) {
+        return ApiResponse.success(memoryService.updateComment(commentId, currentUserId(authentication), request));
     }
 
     @DeleteMapping("/api/v1/comments/{commentId}")

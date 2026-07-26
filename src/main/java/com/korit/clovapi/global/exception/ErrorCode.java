@@ -19,6 +19,7 @@ public enum ErrorCode {
     JOIN_REQUEST_UNDO_EXPIRED("JOIN_REQUEST_UNDO_EXPIRED", HttpStatus.CONFLICT, "가입 신청 되돌리기 시간이 만료되었습니다."),
     PLAN_NOT_COMPLETED("PLAN_NOT_COMPLETED", HttpStatus.CONFLICT, "완료되지 않은 약속에는 추억을 작성할 수 없습니다."),
     MEMORY_ALREADY_WRITTEN("MEMORY_ALREADY_WRITTEN", HttpStatus.CONFLICT, "이미 해당 약속의 추억을 작성했습니다."),
+    COMMENT_ALREADY_EXISTS("COMMENT_ALREADY_EXISTS", HttpStatus.CONFLICT, "이미 이 추억에 한 줄 메시지를 남겼습니다."),
     STAGE_LOCKED("STAGE_LOCKED", HttpStatus.LOCKED, "이전 단계가 완료되지 않았습니다."),
     STAGE_ALREADY_UPLOADED("STAGE_ALREADY_UPLOADED", HttpStatus.CONFLICT, "해당 단계의 사진이 이미 등록되었습니다."),
     STORAGE_QUOTA_EXCEEDED("STORAGE_QUOTA_EXCEEDED", HttpStatus.INSUFFICIENT_STORAGE, "저장 공간이 부족합니다."),
