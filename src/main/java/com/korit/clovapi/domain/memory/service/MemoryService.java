@@ -11,6 +11,7 @@ import com.korit.clovapi.domain.memory.dto.MemoryImageResponse;
 import com.korit.clovapi.domain.memory.dto.MemoryImagesResponse;
 import com.korit.clovapi.domain.memory.dto.MemorySummaryResponse;
 import com.korit.clovapi.domain.memory.dto.ReorderImagesRequest;
+import com.korit.clovapi.domain.memory.dto.UpdateCommentRequest;
 import com.korit.clovapi.domain.memory.dto.UpdateMemoryRequest;
 import com.korit.clovapi.domain.memory.entity.Memory;
 import com.korit.clovapi.domain.memory.entity.MemoryComment;
@@ -254,6 +255,11 @@ public class MemoryService {
     public CommentResponse createComment(long memoryId, long userId, CreateCommentRequest request) {
         Memory memory = findExisting(memoryId);
         roomService.assertActiveMember(memory.getRoomId(), userId);
+        // 한 추억당 작성자 1인 1개(계약 §10, 2026-07-26 리더 결정). 고쳐 쓰려면 PATCH,
+        // 지웠으면 다시 쓸 수 있다. DB의 UNIQUE(memory_id, writer_id)가 최종 방어선.
+        if (commentMapper.findByMemoryIdAndWriterId(memoryId, userId).isPresent()) {
+            throw new DomainException(ErrorCode.COMMENT_ALREADY_EXISTS);
+        }
 
         MemoryComment comment = new MemoryComment();
         comment.setMemoryId(memoryId);
@@ -270,6 +276,18 @@ public class MemoryService {
         return new CommentsResponse(commentMapper.findByMemoryId(memoryId).stream()
                 .map(CommentResponse::from)
                 .toList());
+    }
+
+    @Transactional
+    public CommentResponse updateComment(long commentId, long userId, UpdateCommentRequest request) {
+        MemoryComment comment = commentMapper.findById(commentId)
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+        if (comment.getWriterId() != userId) {
+            throw new DomainException(ErrorCode.NOT_WRITER);
+        }
+        commentMapper.update(commentId, request.content());
+        return CommentResponse.from(commentMapper.findById(commentId)
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
 
     @Transactional

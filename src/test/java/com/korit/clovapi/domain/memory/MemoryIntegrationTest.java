@@ -70,6 +70,9 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                 + "(SELECT id FROM memories WHERE room_id = ?)", roomId);
         jdbcTemplate.update("DELETE FROM memory_tags WHERE memory_id IN "
                 + "(SELECT id FROM memories WHERE room_id = ?)", roomId);
+        // 댓글도 memories를 FK로 잡고 있다 — 안 지우면 아래 memories DELETE가 제약에 걸린다.
+        jdbcTemplate.update("DELETE FROM memory_comments WHERE memory_id IN "
+                + "(SELECT id FROM memories WHERE room_id = ?)", roomId);
         jdbcTemplate.update("DELETE FROM memories WHERE room_id = ?", roomId);
         if (planId != null) {
             jdbcTemplate.update("DELETE FROM plans WHERE id = ?", planId);
@@ -277,6 +280,75 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                         .content("{\"imageUrl\":\"https://cdn.test/over.jpg\"}"))
                 .andExpect(status().is(507))
                 .andExpect(jsonPath("$.error.code").value("STORAGE_QUOTA_EXCEEDED"));
+    }
+
+    // 한 줄 메시지는 한 추억당 작성자 1인 1개(계약 §10) — 중복은 409, 고쳐 쓰려면 PATCH,
+    // 지웠으면 다시 쓸 수 있다. 사람별로는 막히지 않는다.
+    @Test
+    void commentIsLimitedToOnePerWriterAndCanBeEdited() throws Exception {
+        long memoryId = createFreeMemory();
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", roomId, otherId);
+
+        MvcResult created = mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"first message\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.content").value("first message"))
+                .andReturn();
+        long commentId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        // 같은 사람이 같은 추억에 또 쓰면 409.
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"second message\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("COMMENT_ALREADY_EXISTS"));
+
+        // 다른 멤버는 정상 작성(제약은 사람별이 아니라 (추억, 작성자) 쌍이다).
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"me too\"}"))
+                .andExpect(status().isCreated());
+
+        // 남의 메시지는 못 고친다.
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"hijack\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("NOT_WRITER"));
+
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"edited message\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(String.valueOf(commentId)))
+                .andExpect(jsonPath("$.data.content").value("edited message"));
+
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId + 1_000_000)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"nowhere\"}"))
+                .andExpect(status().isNotFound());
+
+        // 지웠으면 다시 쓸 수 있어야 한다(제약이 "영구 1회"가 되면 안 된다).
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", commentId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"rewritten\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2));
     }
 
     private long createFreeMemory() throws Exception {

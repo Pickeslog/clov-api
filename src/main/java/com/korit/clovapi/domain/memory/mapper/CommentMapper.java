@@ -14,7 +14,13 @@ public interface CommentMapper {
 
     Optional<MemoryComment> findById(@Param("commentId") long commentId);
 
+    /** 한 추억당 작성자 1인 1개(계약 §10) — 중복 작성 차단용 조회. */
+    Optional<MemoryComment> findByMemoryIdAndWriterId(@Param("memoryId") long memoryId,
+                                                     @Param("writerId") long writerId);
+
     List<MemoryComment> findByMemoryId(@Param("memoryId") long memoryId);
+
+    void update(@Param("commentId") long commentId, @Param("content") String content);
 
     void delete(@Param("commentId") long commentId);
 }

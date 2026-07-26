@@ -232,6 +232,8 @@ CREATE TABLE memory_comments (
   updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_memory_comments_memory (memory_id),
+  -- 한 추억당 작성자 1인 1개(계약 §10) — 중복 작성은 409 COMMENT_ALREADY_EXISTS.
+  CONSTRAINT uq_memory_comments_memory_writer UNIQUE (memory_id, writer_id),
   CONSTRAINT fk_memory_comments_memory FOREIGN KEY (memory_id) REFERENCES memories(id),
   CONSTRAINT fk_memory_comments_writer FOREIGN KEY (writer_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
