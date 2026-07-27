@@ -1,9 +1,17 @@
 ### Local secrets (never commit) ###
-src/main/resources/application-secret*.yaml
-!src/main/resources/application-secret.example.yaml
-.env
-.env.*
-!.env.example
+# 경로를 고정하지 않는다. 2026-07-27에 `src/main/resources/mapper/` 아래 놓인 사본이
+# 앵커된 패턴(`src/main/resources/application-secret*.yaml`)을 비껴가 커밋에 딸려 들어갔다.
+# GitHub push protection이 막아 유출은 없었지만 그 방어는 우회될 수 있으니 여기서 막는다.
+**/application-secret*.yaml
+**/application-secret*.yml
+!**/application-secret.example.yaml
+!**/application-secret.example.yml
+# `.env`(접두 없음) · `clov-api.env`(접두 있음 — DEPLOY.md가 만들라는 파일) · `.env.production` 전부 커버.
+# 앞의 두 줄만 있던 시절에는 `clov-api.env`가 어디에도 안 걸렸다.
+**/*.env
+**/.env.*
+!**/*.env.example
+!**/.env.example
 
 HELP.md
 .gradle
