@@ -50,3 +50,19 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// 시크릿 yaml은 배포 산출물(JAR)에 넣지 않는다.
+//
+// 이 파일들이 src/main/resources에 있는 이유는 로컬 실행(bootRun·IDE) 때 클래스패스에서 읽기
+// 위해서다. 배포 VM에서는 JAR 옆 워킹디렉터리의 application-secret.yaml을 Spring이 읽는다
+// (deploy/clov-api.service의 WorkingDirectory=/opt/clov-api).
+//
+// processResources가 아니라 bootJar에서 거르는 이유: processResources에서 빼면
+// build/resources/main에도 안 들어가 로컬 실행이 깨진다. JAR만 걸러야 한다.
+//
+// 패턴을 application-secret*로 넓게 잡은 것은 .gitignore와 같은 이유다 — 2026-07-27에
+// application-secret-server.yaml이 앵커된 패턴을 비껴가 커밋에 딸려 들어갈 뻔했다(#79).
+tasks.named('bootJar') {
+    exclude 'application-secret*.yaml'
+    exclude 'application-secret*.yml'
+}
