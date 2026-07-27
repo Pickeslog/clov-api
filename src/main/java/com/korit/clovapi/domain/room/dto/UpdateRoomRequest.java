@@ -9,7 +9,9 @@ import java.util.Set;
 
 public class UpdateRoomRequest {
 
-    @Size(max = 100)
+    // 계약 §6: 앞뒤 공백 제거 후 2~20자. 문자 종류는 제한하지 않는다("제주 가자!"·이모지 허용).
+    // setter에서 trim하므로 @Size는 trim된 값 기준으로 검증되고, 저장되는 값도 trim된 값이다.
+    @Size(min = 2, max = 20)
     private String name;
     @Size(max = 60)
     private String description;
@@ -25,7 +27,7 @@ public class UpdateRoomRequest {
     private final Set<String> providedFields = new HashSet<>();
 
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; providedFields.add("name"); }
+    public void setName(String name) { this.name = name == null ? null : name.trim(); providedFields.add("name"); }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; providedFields.add("description"); }
     public String getThemeColor() { return themeColor; }

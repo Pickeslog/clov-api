@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -174,6 +176,49 @@ class RoomIntegrationTest extends IntegrationTestSupport {
         long createdRoomId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
         roomIds.add(createdRoomId);
         return createdRoomId;
+    }
+
+    @Test
+    void roomNameLengthIsEnforcedOnCreateAndUpdate() throws Exception {
+        // 계약 §6: 앞뒤 공백 제거 후 2~20자.
+        createRoomNamed("가").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        createRoomNamed("가".repeat(21)).andExpect(status().isBadRequest());
+        // 공백으로 부풀린 이름도 막힌다 — trim 뒤 1자. trim이 없으면 @Size가 5자로 보고 통과한다.
+        createRoomNamed("    가    ").andExpect(status().isBadRequest());
+
+        // 편집 경로도 같은 제약을 받는다.
+        long createdRoomId = createRoom(accessToken, "Rename Room");
+        mockMvc.perform(patch("/api/v1/rooms/{roomId}", createdRoomId)
+                        .header("Authorization", bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + "가".repeat(21) + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void roomNameIsTrimmedAndAllowsPunctuationAndEmoji() throws Exception {
+        // 저장되는 값도 trim된 값이어야 한다.
+        MvcResult padded = createRoomNamed("  제주 가자  ").andExpect(status().isCreated()).andReturn();
+        long paddedRoomId = Long.parseLong(JsonPath.read(padded.getResponse().getContentAsString(), "$.data.id"));
+        roomIds.add(paddedRoomId);
+        assertEquals("제주 가자", jdbcTemplate.queryForObject(
+                "SELECT name FROM friendship_rooms WHERE id = ?", String.class, paddedRoomId));
+
+        // 문자 종류는 제한하지 않는다(계약 §6) — 목업 정규식을 그대로 가져오면 이 이름들이 거부된다.
+        // 나중에 누가 @Pattern을 넣으면 여기서 잡히도록 남겨둔 회귀 방지 테스트다.
+        MvcResult fancy = createRoomNamed("제주 가자! 🏝️").andExpect(status().isCreated()).andReturn();
+        long fancyRoomId = Long.parseLong(JsonPath.read(fancy.getResponse().getContentAsString(), "$.data.id"));
+        roomIds.add(fancyRoomId);
+        assertEquals("제주 가자! 🏝️", jdbcTemplate.queryForObject(
+                "SELECT name FROM friendship_rooms WHERE id = ?", String.class, fancyRoomId));
+    }
+
+    private ResultActions createRoomNamed(String name) throws Exception {
+        return mockMvc.perform(post("/api/v1/rooms")
+                .header("Authorization", bearerToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"" + name + "\"}"));
     }
 
     @Test
