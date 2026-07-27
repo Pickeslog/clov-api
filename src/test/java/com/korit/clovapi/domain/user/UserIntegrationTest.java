@@ -143,7 +143,8 @@ class UserIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.darkMode").value(false))
                 .andExpect(jsonPath("$.data.letterTheme").value("postbox"))
-                .andExpect(jsonPath("$.data.memoryCardTheme").value("clothesline"))
+                // 겹침 카드가 명세 기본값(#70) — 'clothesline'로 되돌아가면 신규 가입자가 전원 빨랫줄이 된다
+                .andExpect(jsonPath("$.data.memoryCardTheme").value("stack"))
                 .andExpect(jsonPath("$.data.mascotType").value("crobi"));
 
         mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
