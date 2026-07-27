@@ -248,6 +248,32 @@ class InviteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void alreadyJoinedApplicantGetsDedicatedErrorCarryingRoomId() throws Exception {
+        String code = createInvite();
+
+        // 이미 그 방의 ACTIVE 멤버(host)가 자기 방 코드를 넣으면 신청을 만들지 않고
+        // 전용 코드 + roomId를 준다(계약 §7). 프론트는 이 roomId로 그 방에 바로 이동한다.
+        // 예전에는 여기서 ROOM_MEMBER_NOT_FOUND("멤버가 아닙니다")가 나가 의미가 정반대였다.
+        acceptWithCode(hostId, code)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ROOM_MEMBER_ALREADY_JOINED"))
+                .andExpect(jsonPath("$.error.details[0].field").value("roomId"))
+                .andExpect(jsonPath("$.error.details[0].reason").value(String.valueOf(roomId)));
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM room_join_requests WHERE room_id = ?", Integer.class, roomId));
+    }
+
+    @Test
+    void otherDomainErrorsStillOmitDetails() throws Exception {
+        // details는 계약에 명시된 도메인 에러(roomId)에만 붙는다. 나머지는 예전 그대로 생략돼야 한다.
+        acceptWithCode(applicantId, "CLV-NOSUCH")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVITE_EXPIRED"))
+                .andExpect(jsonPath("$.error.details").doesNotExist());
+    }
+
+    @Test
     void canceledCodeIsRejectedThenReCreateReactivatesSameRow() throws Exception {
         String code = createInvite();
         long inviteId = jdbcTemplate.queryForObject(

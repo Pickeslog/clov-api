@@ -11,6 +11,9 @@ public enum ErrorCode {
     INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
 
     ROOM_MEMBER_NOT_FOUND("ROOM_MEMBER_NOT_FOUND", HttpStatus.FORBIDDEN, "해당 우정공간의 멤버가 아닙니다."),
+    // 이미 참여 중인 방의 초대 코드를 넣은 경우. 전에는 이 조건에서도 ROOM_MEMBER_NOT_FOUND를 던져
+    // 조건과 코드의 의미가 정반대였다(계약 §7). error.details에 roomId를 실어 보내 프론트가 그 방으로 이동한다.
+    ROOM_MEMBER_ALREADY_JOINED("ROOM_MEMBER_ALREADY_JOINED", HttpStatus.CONFLICT, "이미 참여 중인 우정공간입니다."),
     NOT_WRITER("NOT_WRITER", HttpStatus.FORBIDDEN, "작성자 본인만 처리할 수 있습니다."),
     ROOM_CAPACITY_EXCEEDED("ROOM_CAPACITY_EXCEEDED", HttpStatus.CONFLICT, "우정공간 정원이 초과되었습니다."),
     INVITE_EXPIRED("INVITE_EXPIRED", HttpStatus.CONFLICT, "초대 코드가 만료되었습니다."),

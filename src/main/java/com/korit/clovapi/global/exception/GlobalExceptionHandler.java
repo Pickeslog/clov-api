@@ -23,7 +23,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Void>> handleDomainException(DomainException exception) {
-        return failure(exception.errorCode());
+        // details는 대부분 null이고, ApiError가 NON_NULL이라 그때는 응답에서 통째로 생략된다.
+        return failure(exception.errorCode(), exception.details());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

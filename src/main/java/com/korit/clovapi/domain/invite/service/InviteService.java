@@ -18,12 +18,14 @@ import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.domain.room.entity.RoomMember;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
+import com.korit.clovapi.global.response.ApiErrorDetail;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 @Service
 public class InviteService {
@@ -87,8 +89,13 @@ public class InviteService {
         if (!"ACTIVE".equals(invite.getStatus()) || expired) {
             throw new DomainException(ErrorCode.INVITE_EXPIRED);
         }
+        // 이미 그 방의 ACTIVE 멤버면 신청을 만들지 않는다. roomId를 함께 보내 프론트가 그 방으로 이동시킨다(계약 §7).
+        // ROOM_MEMBER_NOT_FOUND는 "멤버가 아님"이라 여기 쓰면 의미가 정반대가 된다.
         if (roomMemberMapper.findActiveByRoomIdAndUserId(invite.getRoomId(), userId).isPresent()) {
-            throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
+            throw new DomainException(
+                    ErrorCode.ROOM_MEMBER_ALREADY_JOINED,
+                    List.of(new ApiErrorDetail("roomId", String.valueOf(invite.getRoomId())))
+            );
         }
 
         RoomJoinRequest joinRequest = new RoomJoinRequest();
