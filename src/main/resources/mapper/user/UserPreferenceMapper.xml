@@ -21,9 +21,13 @@
         WHERE user_id = #{userId}
     </select>
 
+    <!-- 최초 조회 시 lazy insert되는 기본값. 여기 값이 곧 신규 사용자의 기본 설정이라
+         프론트 fallback은 이 row가 생기는 순간부터 도달하지 않는다.
+         memory_card_theme 기본 = 'stack'(겹침 카드) — 명세 정본(09-component-inventory.md:100,
+         프로토타입 clov-profile-modal.js:847의 'coverflow')과 맞춘 값이다. -->
     <insert id="insertDefault">
         INSERT INTO user_preferences (user_id, letter_theme, memory_card_theme)
-        VALUES (#{userId}, 'postbox', 'clothesline')
+        VALUES (#{userId}, 'postbox', 'stack')
     </insert>
 
     <update id="update">
