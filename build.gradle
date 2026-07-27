@@ -47,6 +47,12 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+// 실제 시크릿은 배포 서버의 /opt/clov-api/application-secret.yaml에서만 로드한다.
+// 로컬 전용 파일이 bootJar에 포함되면 개발용 자격 증명이 배포 산출물에 유출될 수 있다.
+tasks.named('processResources') {
+    exclude 'application-secret.yaml'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }
