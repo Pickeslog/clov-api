@@ -7,6 +7,11 @@ spring:
   profiles:
     include:
       - secret
+    group:
+      dev: [ dev, db, secret]
+      prod: [ prod, db, secret]
+    active: dev
+
   security:
     oauth2:
       client:
@@ -69,3 +74,22 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
     jdbc-type-for-null: "NULL"
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+client:
+  url: http://localhost:5173
+---
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+client:
+  url: http://clovlabcalss.store
