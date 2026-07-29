@@ -29,6 +29,11 @@ public enum ErrorCode {
     MASCOT_INTERACTION_LIMIT_REACHED("MASCOT_INTERACTION_LIMIT_REACHED", HttpStatus.TOO_MANY_REQUESTS, "오늘의 마스코트 교감 횟수를 모두 사용했습니다."),
     RATE_LIMITED("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS, "요청 횟수가 제한되었습니다."),
 
+    SHOP_ITEM_NOT_FOUND("SHOP_ITEM_NOT_FOUND", HttpStatus.NOT_FOUND, "존재하지 않는 상점 아이템입니다."),
+    INSUFFICIENT_BALANCE("INSUFFICIENT_BALANCE", HttpStatus.CONFLICT, "골드가 부족합니다."),
+    ITEM_ALREADY_OWNED("ITEM_ALREADY_OWNED", HttpStatus.CONFLICT, "이미 보유 중인 아이템입니다."),
+    ITEM_NOT_PURCHASABLE("ITEM_NOT_PURCHASABLE", HttpStatus.CONFLICT, "지금은 구매할 수 없는 아이템입니다."),
+
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "로그인 정보를 확인해주세요."),
     EMAIL_DUPLICATED("EMAIL_DUPLICATED", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
     TERMS_REQUIRED("TERMS_REQUIRED", HttpStatus.BAD_REQUEST, "필수 약관에 동의해주세요."),

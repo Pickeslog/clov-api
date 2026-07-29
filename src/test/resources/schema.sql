@@ -316,3 +316,39 @@ CREATE TABLE refresh_tokens (
   KEY idx_refresh_tokens_user (user_id),
   CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 19. SHOP_ITEMS ✨ (상점 카탈로그 — SSOT 미등록, db/manual-migrations/2026-07-29-shop-tables.sql 참고)
+CREATE TABLE shop_items (
+  id             BIGINT       NOT NULL AUTO_INCREMENT,
+  name           VARCHAR(100) NOT NULL,
+  description    VARCHAR(255) NULL,
+  category       VARCHAR(20)  NOT NULL COMMENT 'COSTUME/SKIN/EVENT',
+  rarity         VARCHAR(20)  NOT NULL COMMENT 'COMMON/UNCOMMON/RARE/EPIC/LEGENDARY',
+  price          INT          NOT NULL,
+  discount_rate  INT          NOT NULL DEFAULT 0,
+  image_url      VARCHAR(512) NULL,
+  purchasable    BOOLEAN      NOT NULL DEFAULT TRUE,
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 20. USER_WALLETS ✨ (골드는 사용자 단위 — 방과 무관)
+CREATE TABLE user_wallets (
+  user_id       BIGINT   NOT NULL,
+  gold_balance  BIGINT   NOT NULL DEFAULT 0,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_user_wallets_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 21. USER_SHOP_ITEMS ✨ (보유함)
+CREATE TABLE user_shop_items (
+  id            BIGINT   NOT NULL AUTO_INCREMENT,
+  user_id       BIGINT   NOT NULL,
+  item_id       BIGINT   NOT NULL,
+  purchased_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_user_shop_items_user_item (user_id, item_id),
+  CONSTRAINT fk_user_shop_items_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_user_shop_items_item FOREIGN KEY (item_id) REFERENCES shop_items(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
