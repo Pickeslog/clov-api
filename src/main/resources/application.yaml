@@ -104,4 +104,4 @@ spring:
 
 client:
   # 사이트는 certbot으로 HTTPS다. http로 두면 리다이렉트·CORS가 어긋난다.
-  url: https://clovlabcalss.store
+  url: https://clovlov.xyz
