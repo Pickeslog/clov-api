@@ -4,8 +4,10 @@ import com.korit.clovapi.domain.shop.dto.PurchaseResponse;
 import com.korit.clovapi.domain.shop.dto.ShopItemsResponse;
 import com.korit.clovapi.domain.shop.dto.WalletResponse;
 import com.korit.clovapi.domain.shop.service.ShopService;
+import com.korit.clovapi.global.dto.EquippedItemResponse;
 import com.korit.clovapi.global.response.ApiResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,6 +45,17 @@ public class ShopController {
     @PostMapping("/api/v1/shop/items/{itemId}/purchase")
     public ApiResponse<PurchaseResponse> purchase(Authentication authentication, @PathVariable long itemId) {
         return ApiResponse.success(shopService.purchase(currentUserId(authentication), itemId));
+    }
+
+    @PostMapping("/api/v1/shop/items/{itemId}/equip")
+    public ApiResponse<EquippedItemResponse> equip(Authentication authentication, @PathVariable long itemId) {
+        return ApiResponse.success(shopService.equip(currentUserId(authentication), itemId));
+    }
+
+    @DeleteMapping("/api/v1/shop/equipped")
+    public ApiResponse<Void> unequip(Authentication authentication) {
+        shopService.unequip(currentUserId(authentication));
+        return ApiResponse.success(null);
     }
 
     private long currentUserId(Authentication authentication) {

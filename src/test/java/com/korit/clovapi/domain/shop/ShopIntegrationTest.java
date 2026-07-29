@@ -31,6 +31,7 @@ class ShopIntegrationTest extends IntegrationTestSupport {
     private long cheapItemId;
     private long expensiveItemId;
     private long retiredItemId;
+    private long skinItemId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -48,15 +49,18 @@ class ShopIntegrationTest extends IntegrationTestSupport {
         cheapItemId = insertItem("TEST_CHEAP_HAT", "Cheap Hat", "COSTUME", "COMMON", 100, 0, "ACTIVE");
         expensiveItemId = insertItem("TEST_GOLDEN_CROWN", "Golden Crown", "COSTUME", "LEGENDARY", 999_999, 0, "ACTIVE");
         retiredItemId = insertItem("TEST_RETIRED_SKIN", "Retired Skin", "SKIN", "EPIC", 500, 0, "RETIRED");
+        skinItemId = insertItem("TEST_ACTIVE_SKIN", "Active Skin", "SKIN", "COMMON", 50, 0, "ACTIVE");
     }
 
     @AfterEach
     void cleanUp() {
+        // user_preferences.equipped_item_id가 아래에서 지울 shop_items를 참조 중일 수 있어 FK 걸리기 전에 먼저 지운다.
+        jdbcTemplate.update("DELETE FROM user_preferences WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM user_inventory_items WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", userId);
-        jdbcTemplate.update("DELETE FROM shop_items WHERE id IN (?, ?, ?)",
-                cheapItemId, expensiveItemId, retiredItemId);
+        jdbcTemplate.update("DELETE FROM shop_items WHERE id IN (?, ?, ?, ?)",
+                cheapItemId, expensiveItemId, retiredItemId, skinItemId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
@@ -135,6 +139,47 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("SHOP_ITEM_NOT_FOUND"));
+    }
+
+    @Test
+    void equipRequiresOwnershipAndCostumeCategoryThenReflectsInPreferences() throws Exception {
+        // preferences 조회/수정을 한 번도 안 거친 신규 유저 — user_preferences 행이 아직 없는 상태에서
+        // 바로 장착해도 반영돼야 한다(실제로 겪은 버그: UPDATE가 0건 갱신되고도 200을 반환).
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/equip", cheapItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ITEM_NOT_OWNED"));
+
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", skinItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/equip", skinItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ITEM_NOT_EQUIPPABLE"));
+
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/equip", cheapItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.itemId").value(String.valueOf(cheapItemId)));
+
+        mockMvc.perform(get("/api/v1/users/me/preferences")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equippedItem.itemId").value(String.valueOf(cheapItemId)));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/shop/equipped")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/preferences")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equippedItem").doesNotExist());
     }
 
     private long insertItem(String code, String name, String category, String rarity, long price,

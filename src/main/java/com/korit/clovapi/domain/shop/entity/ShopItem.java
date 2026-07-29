@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public class ShopItem {
 
     public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String CATEGORY_COSTUME = "COSTUME";
 
     private long id;
     private String code;

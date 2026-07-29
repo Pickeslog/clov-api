@@ -33,6 +33,8 @@ public enum ErrorCode {
     INSUFFICIENT_BALANCE("INSUFFICIENT_BALANCE", HttpStatus.CONFLICT, "골드가 부족합니다."),
     ITEM_ALREADY_OWNED("ITEM_ALREADY_OWNED", HttpStatus.CONFLICT, "이미 보유 중인 아이템입니다."),
     ITEM_NOT_PURCHASABLE("ITEM_NOT_PURCHASABLE", HttpStatus.CONFLICT, "지금은 구매할 수 없는 아이템입니다."),
+    ITEM_NOT_OWNED("ITEM_NOT_OWNED", HttpStatus.FORBIDDEN, "보유하지 않은 아이템입니다."),
+    ITEM_NOT_EQUIPPABLE("ITEM_NOT_EQUIPPABLE", HttpStatus.CONFLICT, "장착할 수 없는 아이템입니다."),
 
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "로그인 정보를 확인해주세요."),
     EMAIL_DUPLICATED("EMAIL_DUPLICATED", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),

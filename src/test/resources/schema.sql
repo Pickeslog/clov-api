@@ -38,6 +38,7 @@ CREATE TABLE user_preferences (
   letter_theme          VARCHAR(20)  NULL COMMENT '선물상자/우체통',
   memory_card_theme     VARCHAR(20)  NULL COMMENT '빨랫줄/겹침/일기장',
   mascot_type           VARCHAR(20)  NOT NULL DEFAULT 'crobi' COMMENT 'crobi/rob',
+  equipped_item_id      BIGINT       NULL COMMENT '장착 중인 shop_items.id(COSTUME만), NULL=미장착. FK는 shop_items 생성 후 아래에서 추가',
   updated_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   CONSTRAINT fk_user_prefs_user FOREIGN KEY (user_id) REFERENCES users(id)
@@ -372,3 +373,6 @@ CREATE TABLE wallet_transactions (
   KEY idx_wallet_transactions_user (user_id, created_at),
   CONSTRAINT fk_wallet_transactions_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE user_preferences
+  ADD CONSTRAINT fk_user_preferences_equipped_item FOREIGN KEY (equipped_item_id) REFERENCES shop_items(id);
