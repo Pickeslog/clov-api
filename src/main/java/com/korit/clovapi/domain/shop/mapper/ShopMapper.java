@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.shop.mapper;
 
 import com.korit.clovapi.domain.shop.entity.ShopItem;
 import com.korit.clovapi.domain.shop.entity.UserWallet;
+import com.korit.clovapi.domain.shop.entity.WalletTransaction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -24,11 +25,14 @@ public interface ShopMapper {
 
     Optional<UserWallet> findWallet(@Param("userId") long userId);
 
-    void insertWallet(@Param("userId") long userId, @Param("goldBalance") long goldBalance);
+    /** INSERT IGNORE라 경합 시 한쪽만 실제로 삽입된다 — 반환값(영향받은 행 수)으로 그걸 구분한다. */
+    int insertWallet(@Param("userId") long userId, @Param("balance") long balance);
 
-    void updateBalance(@Param("userId") long userId, @Param("goldBalance") long goldBalance);
+    void updateBalance(@Param("userId") long userId, @Param("balance") long balance);
 
     boolean existsInInventory(@Param("userId") long userId, @Param("itemId") long itemId);
 
-    void insertInventory(@Param("userId") long userId, @Param("itemId") long itemId);
+    void insertInventory(@Param("userId") long userId, @Param("itemId") long itemId, @Param("paidPrice") long paidPrice);
+
+    void insertTransaction(WalletTransaction transaction);
 }

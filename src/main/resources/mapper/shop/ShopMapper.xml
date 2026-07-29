@@ -6,6 +6,7 @@
 
     <resultMap id="shopItemResultMap" type="com.korit.clovapi.domain.shop.entity.ShopItem">
         <id property="id" column="id"/>
+        <result property="code" column="code"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
         <result property="category" column="category"/>
@@ -13,66 +14,73 @@
         <result property="price" column="price"/>
         <result property="discountRate" column="discount_rate"/>
         <result property="imageUrl" column="image_url"/>
-        <result property="purchasable" column="purchasable"/>
+        <result property="status" column="status"/>
+        <result property="sortOrder" column="sort_order"/>
         <result property="owned" column="owned"/>
         <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <resultMap id="walletResultMap" type="com.korit.clovapi.domain.shop.entity.UserWallet">
         <id property="userId" column="user_id"/>
-        <result property="goldBalance" column="gold_balance"/>
+        <result property="balance" column="balance"/>
     </resultMap>
 
     <select id="findCatalog" resultMap="shopItemResultMap">
-        SELECT i.id, i.name, i.description, i.category, i.rarity, i.price, i.discount_rate,
-               i.image_url, i.purchasable, i.created_at,
-               (usi.id IS NOT NULL) AS owned
+        SELECT i.id, i.code, i.name, i.description, i.category, i.rarity, i.price, i.discount_rate,
+               i.image_url, i.status, i.sort_order, i.created_at, i.updated_at,
+               (inv.id IS NOT NULL) AS owned
         FROM shop_items i
-        LEFT JOIN user_shop_items usi ON usi.item_id = i.id AND usi.user_id = #{userId}
+        LEFT JOIN user_inventory_items inv ON inv.item_id = i.id AND inv.user_id = #{userId}
         WHERE (#{category} IS NULL OR i.category = #{category})
           AND (#{rarity} IS NULL OR i.rarity = #{rarity})
-        ORDER BY i.rarity ASC, i.price ASC, i.id ASC
+        ORDER BY i.sort_order ASC, i.id ASC
     </select>
 
     <select id="findInventory" resultMap="shopItemResultMap">
-        SELECT i.id, i.name, i.description, i.category, i.rarity, i.price, i.discount_rate,
-               i.image_url, i.purchasable, i.created_at, TRUE AS owned
-        FROM user_shop_items usi
-        JOIN shop_items i ON i.id = usi.item_id
-        WHERE usi.user_id = #{userId}
-        ORDER BY usi.purchased_at DESC
+        SELECT i.id, i.code, i.name, i.description, i.category, i.rarity, i.price, i.discount_rate,
+               i.image_url, i.status, i.sort_order, i.created_at, i.updated_at, TRUE AS owned
+        FROM user_inventory_items inv
+        JOIN shop_items i ON i.id = inv.item_id
+        WHERE inv.user_id = #{userId}
+        ORDER BY inv.purchased_at DESC
     </select>
 
     <select id="findById" resultMap="shopItemResultMap">
-        SELECT id, name, description, category, rarity, price, discount_rate,
-               image_url, purchasable, created_at, FALSE AS owned
+        SELECT id, code, name, description, category, rarity, price, discount_rate,
+               image_url, status, sort_order, created_at, updated_at, FALSE AS owned
         FROM shop_items
         WHERE id = #{itemId}
     </select>
 
     <!-- 구매는 읽고-확인-차감이라 동시 구매 시 잔액이 꼬일 수 있어 행을 잠그고 읽는다. -->
     <select id="findWalletForUpdate" resultMap="walletResultMap">
-        SELECT user_id, gold_balance FROM user_wallets WHERE user_id = #{userId} FOR UPDATE
+        SELECT user_id, balance FROM user_wallets WHERE user_id = #{userId} FOR UPDATE
     </select>
 
     <select id="findWallet" resultMap="walletResultMap">
-        SELECT user_id, gold_balance FROM user_wallets WHERE user_id = #{userId}
+        SELECT user_id, balance FROM user_wallets WHERE user_id = #{userId}
     </select>
 
     <!-- IGNORE: 동시 요청으로 지갑 존재 확인 사이에 경합이 생겨도 중복 생성 에러 대신 조용히 넘어간다. -->
     <insert id="insertWallet">
-        INSERT IGNORE INTO user_wallets (user_id, gold_balance) VALUES (#{userId}, #{goldBalance})
+        INSERT IGNORE INTO user_wallets (user_id, balance) VALUES (#{userId}, #{balance})
     </insert>
 
     <update id="updateBalance">
-        UPDATE user_wallets SET gold_balance = #{goldBalance} WHERE user_id = #{userId}
+        UPDATE user_wallets SET balance = #{balance} WHERE user_id = #{userId}
     </update>
 
     <select id="existsInInventory" resultType="boolean">
-        SELECT EXISTS(SELECT 1 FROM user_shop_items WHERE user_id = #{userId} AND item_id = #{itemId})
+        SELECT EXISTS(SELECT 1 FROM user_inventory_items WHERE user_id = #{userId} AND item_id = #{itemId})
     </select>
 
     <insert id="insertInventory">
-        INSERT INTO user_shop_items (user_id, item_id) VALUES (#{userId}, #{itemId})
+        INSERT INTO user_inventory_items (user_id, item_id, paid_price) VALUES (#{userId}, #{itemId}, #{paidPrice})
+    </insert>
+
+    <insert id="insertTransaction">
+        INSERT INTO wallet_transactions (user_id, reason, amount, balance_after, reference_id)
+        VALUES (#{userId}, #{reason}, #{amount}, #{balanceAfter}, #{referenceId})
     </insert>
 </mapper>

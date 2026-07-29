@@ -3,7 +3,7 @@ package com.korit.clovapi.domain.shop.entity;
 public class UserWallet {
 
     private long userId;
-    private long goldBalance;
+    private long balance;
 
     public long getUserId() {
         return userId;
@@ -13,11 +13,11 @@ public class UserWallet {
         this.userId = userId;
     }
 
-    public long getGoldBalance() {
-        return goldBalance;
+    public long getBalance() {
+        return balance;
     }
 
-    public void setGoldBalance(long goldBalance) {
-        this.goldBalance = goldBalance;
+    public void setBalance(long balance) {
+        this.balance = balance;
     }
 }

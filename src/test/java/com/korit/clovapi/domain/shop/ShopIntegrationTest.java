@@ -30,7 +30,7 @@ class ShopIntegrationTest extends IntegrationTestSupport {
     private long userId;
     private long cheapItemId;
     private long expensiveItemId;
-    private long unpurchasableItemId;
+    private long retiredItemId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -45,27 +45,32 @@ class ShopIntegrationTest extends IntegrationTestSupport {
         token = JsonPath.read(signup.getResponse().getContentAsString(), "$.data.accessToken");
         userId = Long.parseLong(JsonPath.read(signup.getResponse().getContentAsString(), "$.data.user.id"));
 
-        cheapItemId = insertItem("Cheap Hat", "COSTUME", "COMMON", 100, 0, true);
-        expensiveItemId = insertItem("Golden Crown", "COSTUME", "LEGENDARY", 999_999, 0, true);
-        unpurchasableItemId = insertItem("Retired Skin", "SKIN", "EPIC", 500, 0, false);
+        cheapItemId = insertItem("TEST_CHEAP_HAT", "Cheap Hat", "COSTUME", "COMMON", 100, 0, "ACTIVE");
+        expensiveItemId = insertItem("TEST_GOLDEN_CROWN", "Golden Crown", "COSTUME", "LEGENDARY", 999_999, 0, "ACTIVE");
+        retiredItemId = insertItem("TEST_RETIRED_SKIN", "Retired Skin", "SKIN", "EPIC", 500, 0, "RETIRED");
     }
 
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update("DELETE FROM user_shop_items WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM user_inventory_items WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM shop_items WHERE id IN (?, ?, ?)",
-                cheapItemId, expensiveItemId, unpurchasableItemId);
+                cheapItemId, expensiveItemId, retiredItemId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
 
     @Test
-    void walletStartsWithABalanceAndCatalogListsSeededItems() throws Exception {
+    void walletStartsWithSignupGrantAndCatalogListsSeededItems() throws Exception {
         mockMvc.perform(get("/api/v1/shop/wallet")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.balance").value(1000));
+                .andExpect(jsonPath("$.data.balance").value(20000));
+
+        String grantReason = jdbcTemplate.queryForObject(
+                "SELECT reason FROM wallet_transactions WHERE user_id = ?", String.class, userId);
+        org.junit.jupiter.api.Assertions.assertEquals("SIGNUP_GRANT", grantReason);
 
         mockMvc.perform(get("/api/v1/shop/items")
                         .header("Authorization", "Bearer " + token)
@@ -75,28 +80,38 @@ class ShopIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void purchaseDeductsBalanceAndMovesItemIntoInventory() throws Exception {
+    void purchaseDeductsBalanceRecordsLedgerAndMovesItemIntoInventory() throws Exception {
         mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.item.id").value(String.valueOf(cheapItemId)))
                 .andExpect(jsonPath("$.data.item.owned").value(true))
-                .andExpect(jsonPath("$.data.balance").value(900));
+                .andExpect(jsonPath("$.data.balance").value(19900));
 
         mockMvc.perform(get("/api/v1/shop/wallet")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.balance").value(900));
+                .andExpect(jsonPath("$.data.balance").value(19900));
 
         mockMvc.perform(get("/api/v1/shop/inventory")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.length()").value(1))
                 .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(cheapItemId)));
+
+        Integer paidPrice = jdbcTemplate.queryForObject(
+                "SELECT paid_price FROM user_inventory_items WHERE user_id = ? AND item_id = ?",
+                Integer.class, userId, cheapItemId);
+        org.junit.jupiter.api.Assertions.assertEquals(100, paidPrice);
+
+        Integer purchaseAmount = jdbcTemplate.queryForObject(
+                "SELECT amount FROM wallet_transactions WHERE user_id = ? AND reason = 'PURCHASE'",
+                Integer.class, userId);
+        org.junit.jupiter.api.Assertions.assertEquals(-100, purchaseAmount);
     }
 
     @Test
-    void purchaseFailsWhenAlreadyOwnedTooExpensiveOrNotPurchasable() throws Exception {
+    void purchaseFailsWhenAlreadyOwnedTooExpensiveOrRetired() throws Exception {
         mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -111,7 +126,7 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_BALANCE"));
 
-        mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", unpurchasableItemId)
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", retiredItemId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("ITEM_NOT_PURCHASABLE"));
@@ -122,12 +137,12 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.error.code").value("SHOP_ITEM_NOT_FOUND"));
     }
 
-    private long insertItem(String name, String category, String rarity, long price, int discountRate,
-                             boolean purchasable) {
+    private long insertItem(String code, String name, String category, String rarity, long price,
+                             int discountRate, String status) {
         jdbcTemplate.update(
-                "INSERT INTO shop_items (name, category, rarity, price, discount_rate, purchasable) "
-                        + "VALUES (?, ?, ?, ?, ?, ?)",
-                name, category, rarity, price, discountRate, purchasable);
-        return jdbcTemplate.queryForObject("SELECT id FROM shop_items WHERE name = ?", Long.class, name);
+                "INSERT INTO shop_items (code, name, category, rarity, price, discount_rate, status) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                code, name, category, rarity, price, discountRate, status);
+        return jdbcTemplate.queryForObject("SELECT id FROM shop_items WHERE code = ?", Long.class, code);
     }
 }
