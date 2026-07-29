@@ -72,10 +72,4 @@ INSERT INTO shop_items (code, name, description, category, rarity, price, discou
 ('EVENT_SUMMER_NIGHT', '한정 여름밤 스킨', '여름밤 불꽃놀이 한정 테마', 'EVENT', 'LEGENDARY', 12000, 0, 110),
 ('EVENT_FIRST_SNOW', '한정 첫눈 프레임', '첫눈 오는 날 한정 프레임', 'EVENT', 'EPIC', 6400, 0, 120);
 
--- 코스튬 6종 image_url 채우기 — 상세는 2026-07-29-costume-image-urls.sql 참고.
-UPDATE shop_items SET image_url = '/costumes/neon-hood.svg'    WHERE code = 'COSTUME_NEON_HOOD';
-UPDATE shop_items SET image_url = '/costumes/starlight.svg'    WHERE code = 'COSTUME_STARLIGHT';
-UPDATE shop_items SET image_url = '/costumes/cherry-set.svg'   WHERE code = 'COSTUME_CHERRY_SET';
-UPDATE shop_items SET image_url = '/costumes/clover-badge.svg' WHERE code = 'COSTUME_CLOVER_BADGE';
-UPDATE shop_items SET image_url = '/costumes/crobi-party.svg'  WHERE code = 'COSTUME_CROBI_PARTY';
-UPDATE shop_items SET image_url = '/costumes/rob-explorer.svg' WHERE code = 'COSTUME_ROB_EXPLORER';
+-- 12종 전체 image_url 채우기는 2026-07-29-shop-item-art.sql 에서 이어서 수행한다.
