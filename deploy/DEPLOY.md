@@ -54,6 +54,7 @@ sudo mv clov-api-*.jar /opt/clov-api/clov-api.jar
 - `spring.datasource.url` = `jdbc:mysql://localhost:3306/clov?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8`
 - `spring.datasource.username/password` = 위 clov 계정
 - OAuth `client-id/secret` (3사), `jwt.secret`(강한 base64), R2 `app.storage.*` (dev와 동일 clov-media 가능)
+- `spring.mail.*` — **비밀번호 재설정 메일을 실제로 보낼 때만**(계약 §4-4). 기본값은 `app.mail.mode=log`라 이 블록 없이도 부팅된다. ⚠️ **`APP_MAIL_MODE=smtp`와 이 블록은 항상 같이 넣고 같이 뺀다** — 한쪽만 있으면 `JavaMailSender` 빈이 없어 부팅이 실패한다
 
 **배포 env** 🖥️ `/opt/clov-api/clov-api.env` — `clov-api.env.example` 복사(도메인 그대로면 수정 없음).
 
