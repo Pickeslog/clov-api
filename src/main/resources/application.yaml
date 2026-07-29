@@ -60,6 +60,13 @@ server:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  mail:
+    # log = 재설정 링크를 콘솔에만 출력(기본) · smtp = 실제 발송
+    # ⚠️ 기본값이 log인 것은 의도적이다 — 메일 설정이 없는 서버에 배포돼도 부팅이 깨지지 않는다.
+    #    SMTP 계정이 준비되면 clov-api.env에 APP_MAIL_MODE=smtp를 넣고
+    #    application-secret.yaml에 spring.mail.host/username/password를 추가한다(코드 수정 불필요).
+    mode: ${APP_MAIL_MODE:log}
+    from: ${APP_MAIL_FROM:no-reply@clovlabcalss.store}
   oauth2:
     # 배포: APP_OAUTH2_REDIRECT_URL=https://clovlabcalss.store/oauth2/redirect (소셜 로그인 후 프론트 복귀)
     redirect-url: ${APP_OAUTH2_REDIRECT_URL:http://localhost:5173/oauth2/redirect}

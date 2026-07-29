@@ -316,3 +316,19 @@ CREATE TABLE refresh_tokens (
   KEY idx_refresh_tokens_user (user_id),
   CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 19. PASSWORD_RESET_TOKENS ✨ (비밀번호 재설정 — 계약 §4-4)
+-- 유효 판정: used_at IS NULL AND revoked_at IS NULL AND expires_at > NOW()
+CREATE TABLE password_reset_tokens (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id     BIGINT       NOT NULL,
+  token_hash  VARCHAR(255) NOT NULL COMMENT '원문 아닌 해시 저장(refresh_tokens와 동일 방식)',
+  expires_at  DATETIME     NOT NULL COMMENT '발급 +1시간',
+  used_at     DATETIME     NULL COMMENT '1회용 — 재설정 성공 시 기록',
+  revoked_at  DATETIME     NULL COMMENT '같은 계정이 재요청하면 이전 토큰 무효화',
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_password_reset_token_hash (token_hash),
+  KEY idx_password_reset_tokens_user (user_id),
+  CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
