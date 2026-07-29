@@ -318,7 +318,23 @@ CREATE TABLE refresh_tokens (
   CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 19. SHOP_ITEMS ✨ (상점 카탈로그 — SSOT 미등록. 개발 DB에 이미 존재하는 실스키마를 그대로 반영)
+-- 19. PASSWORD_RESET_TOKENS ✨ (비밀번호 재설정 — 계약 §4-4)
+-- 유효 판정: used_at IS NULL AND revoked_at IS NULL AND expires_at > NOW()
+CREATE TABLE password_reset_tokens (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id     BIGINT       NOT NULL,
+  token_hash  VARCHAR(255) NOT NULL COMMENT '원문 아닌 해시 저장(refresh_tokens와 동일 방식)',
+  expires_at  DATETIME     NOT NULL COMMENT '발급 +1시간',
+  used_at     DATETIME     NULL COMMENT '1회용 — 재설정 성공 시 기록',
+  revoked_at  DATETIME     NULL COMMENT '같은 계정이 재요청하면 이전 토큰 무효화',
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_password_reset_token_hash (token_hash),
+  KEY idx_password_reset_tokens_user (user_id),
+  CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 20. SHOP_ITEMS ✨ (상점 카탈로그 — SSOT 미등록. 개발 DB에 이미 존재하는 실스키마를 그대로 반영)
 CREATE TABLE shop_items (
   id             BIGINT       NOT NULL AUTO_INCREMENT,
   code           VARCHAR(50)  NOT NULL,
@@ -337,7 +353,7 @@ CREATE TABLE shop_items (
   UNIQUE KEY uk_shop_items_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 20. USER_WALLETS ✨ (골드는 사용자 단위 — 방과 무관)
+-- 21. USER_WALLETS ✨ (골드는 사용자 단위 — 방과 무관)
 CREATE TABLE user_wallets (
   user_id     BIGINT   NOT NULL,
   balance     INT      NOT NULL DEFAULT 0,
@@ -347,7 +363,7 @@ CREATE TABLE user_wallets (
   CONSTRAINT fk_user_wallets_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 21. USER_INVENTORY_ITEMS ✨ (보유함)
+-- 22. USER_INVENTORY_ITEMS ✨ (보유함)
 CREATE TABLE user_inventory_items (
   id            BIGINT   NOT NULL AUTO_INCREMENT,
   user_id       BIGINT   NOT NULL,
@@ -360,7 +376,7 @@ CREATE TABLE user_inventory_items (
   CONSTRAINT fk_user_inventory_items_item FOREIGN KEY (item_id) REFERENCES shop_items(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 22. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE)
+-- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE)
 CREATE TABLE wallet_transactions (
   id             BIGINT      NOT NULL AUTO_INCREMENT,
   user_id        BIGINT      NOT NULL,
