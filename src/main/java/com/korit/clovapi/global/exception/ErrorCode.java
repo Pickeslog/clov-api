@@ -35,7 +35,12 @@ public enum ErrorCode {
     INVALID_TOKEN("INVALID_TOKEN", HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
     TOKEN_EXPIRED("TOKEN_EXPIRED", HttpStatus.UNAUTHORIZED, "만료되었거나 무효화된 토큰입니다."),
     OAUTH_CODE_INVALID("OAUTH_CODE_INVALID", HttpStatus.UNAUTHORIZED, "유효하지 않은 OAuth 코드입니다."),
-    OAUTH_EMAIL_REQUIRED("OAUTH_EMAIL_REQUIRED", HttpStatus.BAD_REQUEST, "소셜 계정 이메일이 필요합니다.");
+    OAUTH_EMAIL_REQUIRED("OAUTH_EMAIL_REQUIRED", HttpStatus.BAD_REQUEST, "소셜 계정 이메일이 필요합니다."),
+    // 위조·만료·이미 사용됨을 구분하지 않는다(계약 §4-4).
+    // ⚠️ 401이 아니라 400인 이유: 프론트 api/client.js의 응답 인터셉터가 401을 받으면 /auth/refresh를
+    //    시도한다. 401로 두면 비로그인 상태인데 갱신을 부르고, 실패해 토큰을 clear()하는 엉뚱한 경로로
+    //    빠진다. refresh 계열(INVALID_TOKEN·TOKEN_EXPIRED)이 401인 것과 다른 이유가 이것이다.
+    PASSWORD_RESET_TOKEN_INVALID("PASSWORD_RESET_TOKEN_INVALID", HttpStatus.BAD_REQUEST, "만료되었거나 이미 사용된 링크입니다. 다시 요청해주세요.");
 
     private final String code;
     private final HttpStatus httpStatus;
