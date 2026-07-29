@@ -12,8 +12,8 @@ spring:
     #    운영은 clov-api.env의 SPRING_PROFILES_ACTIVE=prod가 그 역할을 한다.
     # db는 아직 application-db.yaml이 없어 no-op이다(DB 설정 분리가 필요해지면 그때 추가).
     group:
-      dev: [db, secret]
-      prod: [db, secret]
+      dev: [dev, db, secret]
+      prod: [prod, db, secret]
     active: dev
 
   security:
@@ -97,4 +97,4 @@ spring:
 
 client:
   # 사이트는 certbot으로 HTTPS다. http로 두면 리다이렉트·CORS가 어긋난다.
-  url: https://clovlabcalss.store
+  url: https://clovlab.store
