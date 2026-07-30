@@ -62,11 +62,14 @@ jobs:
         with:
           ref: ${{github.ref}}
           
+      # 시크릿 주입 줄은 뺐다 — clov-api는 시크릿을 이미지에 넣지 않고 VM의
+      # /app/application-secret.yaml 에 마운트한다. .dockerignore가 그 파일을
+      # 빌드 컨텍스트에서 제외하므로 여기서 만들어도 이미지에 들어가지 않는다.
+      # 빌드(Gradle)는 Dockerfile이 멀티스테이지로 안에서 수행한다.
       - name: Springboot Build and Docker image build and push
         run: |
-          echo ${{env.APPLICATION_SECRET}} | base64 --decode > ./src/main/resources/application-secret.yml
           echo "${{env.DOCKER_PASSWORD}}" | docker login -u ${{env.DOCKER_USERNAME}} --password-stdin
-          docker build -t ${{env.DOCKER_USERNAME}}/spring-app:latest .
+          docker build -t ${{env.DOCKER_USERNAME}}/springboot-app:latest .
           docker push ${{env.DOCKER_USERNAME}}/springboot-app:latest
 
       - name: GCP SSH REMOTE 원격접속
@@ -77,9 +80,9 @@ jobs:
           key: ${{env.GCP_VM_SSHKEY}}
           script: |
             cd /home/${{env.GCP_VM_USERNAME}}
-            sudo docker compose -f api-docker-compose.yml pull
-            sudo docker compose -f api-docker-compose.yml down
-            sudo docker compose -f api-docker-compose.yml up -d
+            sudo docker compose -f api-docker-compose.yaml pull
+            sudo docker compose -f api-docker-compose.yaml down
+            sudo docker compose -f api-docker-compose.yaml up -d
 
 
             
