@@ -48,15 +48,35 @@ jobs:
             echo "DOCKER_PASSWORD=${{secrets.DOCKER_PASSWORD_KIMGYUBI}}" >> $GITHUB_ENV
           fi
           
-      - name: Setup SSH Key
+      # 원래 여기 있던 "Setup SSH Key"는 ~/.ssh/id_rsa를 만들었지만 아무도 읽지 않았다 —
+      # appleboy/ssh-action은 with.key 입력만 쓰고 러너의 ~/.ssh는 보지도 않는다. 게다가
+      # 검증줄이 `|| echo`로 끝나서 키가 깨져 있어도 스텝이 통과했고, 그래서 배포 실패의
+      # 진짜 원인이 로그에 안 남았다(2026-07-30 GCP-VM-CICD #1·#2: 도커 push까지 성공한 뒤
+      # SSH 스텝만 1초 만에 죽음). 값이 비었는지·개인키로 파싱되는지를 여기서 끊는다.
+      - name: 배포 시크릿 검증
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ env.GCP_VM_SSHKEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          
-          # 검증
-          ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid key format"
-          
+          missing=""
+          for name in GCP_VM_HOST GCP_VM_USERNAME GCP_VM_SSHKEY DOCKER_USERNAME DOCKER_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          suffix=$(echo "${{ github.ref_name }}" | sed 's/^deploy-//' | tr '[:lower:]' '[:upper:]')
+          if [ -n "$missing" ]; then
+            echo "::error::'${{ github.ref_name }}' 브랜치에 필요한 시크릿이 비어 있다:$missing"
+            echo "::error::Settings > Secrets and variables > Actions 에 <이름>_${suffix} 형태로 등록해야 한다(예: GCP_VM_HOST_${suffix})."
+            exit 1
+          fi
+          keyfile=$(mktemp)
+          printf '%s\n' "$GCP_VM_SSHKEY" > "$keyfile"
+          chmod 600 "$keyfile"
+          if ! ssh-keygen -y -f "$keyfile" > /dev/null 2>&1; then
+            rm -f "$keyfile"
+            echo "::error::GCP_VM_SSHKEY_${suffix} 를 개인키로 읽을 수 없다."
+            echo "::error::공개키(.pub)를 넣었거나 줄바꿈이 사라진 경우가 대부분이다 — BEGIN/END 줄을 포함한 파일 전체를 그대로 붙여넣어야 한다."
+            exit 1
+          fi
+          rm -f "$keyfile"
+          echo "시크릿 5종 확인·개인키 파싱 OK (suffix=${suffix})"
+
       - name: Checkout
         uses: actions/checkout@v6.0.2
         with:
@@ -72,18 +92,21 @@ jobs:
           docker build -t ${{env.DOCKER_USERNAME}}/springboot-app:latest .
           docker push ${{env.DOCKER_USERNAME}}/springboot-app:latest
 
+      # script_stop이 없으면 pull이 실패해도 뒤의 down/up이 그대로 돌아 "성공한 배포"로
+      # 보이면서 옛 이미지가 다시 뜬다. 첫 줄에서 끊는다.
       - name: GCP SSH REMOTE 원격접속
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{env.GCP_VM_HOST}}
           username: ${{env.GCP_VM_USERNAME}}
           key: ${{env.GCP_VM_SSHKEY}}
+          port: 22
+          timeout: 30s
+          command_timeout: 10m
+          script_stop: true
           script: |
             cd /home/${{env.GCP_VM_USERNAME}}
             sudo docker compose -f api-docker-compose.yaml pull
             sudo docker compose -f api-docker-compose.yaml down
             sudo docker compose -f api-docker-compose.yaml up -d
 
-
-            
-        
