@@ -44,8 +44,10 @@ import java.util.stream.Collectors;
 public class MemoryService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
-    // 쿼터 상한(memory당 장수) — 계약 미정, 리더 확정 시 이 값만 교체(#45).
-    private static final int MAX_IMAGES_PER_MEMORY = 10;
+    // 쿼터 상한(memory당 장수) — 계약 §(03-memory-feed-screen.md "입력 제약") 확정값.
+    // 프로토타입(30장)과 다르게 8장으로 낮춘다 — 프로덕션은 추억마다 R2에 실 파일이 올라가
+    // 저장 비용이 있어서다(리더 결정 2026-07-30, web-design-repository #19).
+    private static final int MAX_IMAGES_PER_MEMORY = 8;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;

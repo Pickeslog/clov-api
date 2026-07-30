@@ -98,11 +98,15 @@ class ExpIntegrationTest extends IntegrationTestSupport {
     void imageCommitGrantsBonusPerImageUpToTen() throws Exception {
         long memoryId = createFreeMemory("사진 보너스 확인"); // +25
 
-        // 이미지 쿼터가 추억당 10장이라 API로는 10장까지만 올릴 수 있다.
-        for (int index = 0; index < 10; index++) {
+        // 이미지 쿼터가 추억당 8장(계약 §"입력 제약")이라 API로는 8장까지만 올릴 수 있다.
+        // XP 보너스 상한(10)은 쿼터와 별개 값이라 쿼터보다 크다 — 나머지는 서비스를 직접 호출해
+        // "쿼터를 넘겨서라도 보너스가 10에서 멈추는지"를 확인한다(쿼터가 나중에 다시 늘어나도
+        // 이 상한 로직 자체는 그대로 버텨야 한다).
+        for (int index = 0; index < 8; index++) {
             commitImage(memoryId, index);
         }
-        // 쿼터가 나중에 늘어나도 XP 보너스는 10에서 멈춰야 하므로 상한을 직접 확인한다.
+        expService.grantMemoryImageBonus(roomId, userId, memoryId);
+        expService.grantMemoryImageBonus(roomId, userId, memoryId);
         expService.grantMemoryImageBonus(roomId, userId, memoryId);
 
         // 25 + 10 = 35 → 레벨 1, 진행도 35

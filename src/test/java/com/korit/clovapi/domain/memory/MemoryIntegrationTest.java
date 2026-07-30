@@ -265,7 +265,7 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
     @Test
     void imageQuotaReturns507WhenExceeded() throws Exception {
         long memoryId = createFreeMemory();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 8; i++) {
             commitImage(memoryId, "https://cdn.test/q" + i + ".jpg");
         }
         mockMvc.perform(post("/api/v1/memories/{memoryId}/images/presign", memoryId)
