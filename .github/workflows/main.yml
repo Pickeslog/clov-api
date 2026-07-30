@@ -104,8 +104,20 @@ jobs:
           timeout: 30s
           command_timeout: 10m
           script_stop: true
+          envs: DOCKER_USERNAME
           script: |
             cd /home/${{env.GCP_VM_USERNAME}}
+            # VM의 compose가 방금 push한 이미지를 보고 있는지 먼저 확인한다. 이름이 다르면
+            # pull이 "성공"하면서 옛 이미지를 그대로 다시 띄우고, 워크플로는 초록불이 된다.
+            # 배포가 된 줄 알고 넘어가는 게 실패보다 나쁘다.
+            # (2026-07-30 실제 사례: chacha VM의 compose는 chacha1650a/spring-app인데
+            #  워크플로는 chacha1650a/springboot-app을 밀고 있었다.)
+            if ! grep -q "${DOCKER_USERNAME}/springboot-app" api-docker-compose.yaml; then
+              echo "api-docker-compose.yaml이 ${DOCKER_USERNAME}/springboot-app 을 보고 있지 않다."
+              echo "현재 image 줄:"
+              grep -n 'image:' api-docker-compose.yaml
+              exit 1
+            fi
             sudo docker compose -f api-docker-compose.yaml pull
             sudo docker compose -f api-docker-compose.yaml down
             sudo docker compose -f api-docker-compose.yaml up -d
