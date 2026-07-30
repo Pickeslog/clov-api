@@ -1,0 +1,89 @@
+name: GCP-VM-CICD
+
+on:
+  push:
+    branches: [deploy-myeongjun, deploy-chacha, deploy-lami, deploy-kimgyubi]
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: "환경변수 세팅"
+        run: |
+          if [ "${{github.ref}}" == 'refs/heads/deploy-myeongjun' ]; then
+            echo "GCP_VM_HOST=${{secrets.GCP_VM_HOST_MYEONGJUN}}" >> $GITHUB_ENV
+            echo "GCP_VM_USERNAME=${{secrets.GCP_VM_USERNAME_MYEONGJUN}}" >> $GITHUB_ENV
+            echo "GCP_VM_SSHKEY<<KEY_EOF" >> $GITHUB_ENV
+            echo "${{ secrets.GCP_VM_SSHKEY_MYEONGJUN }}" >> $GITHUB_ENV
+            echo "KEY_EOF" >> $GITHUB_ENV
+            echo "DOCKER_USERNAME=${{secrets.DOCKER_USERNAME_MYEONGJUN}}" >> $GITHUB_ENV
+            echo "DOCKER_PASSWORD=${{secrets.DOCKER_PASSWORD_MYEONGJUN}}" >> $GITHUB_ENV
+          fi
+          if [ "${{github.ref}}" == 'refs/heads/deploy-chacha' ]; then
+            echo "GCP_VM_HOST=${{secrets.GCP_VM_HOST_CHACHA}}" >> $GITHUB_ENV
+            echo "GCP_VM_USERNAME=${{secrets.GCP_VM_USERNAME_CHACHA}}" >> $GITHUB_ENV
+            echo "GCP_VM_SSHKEY<<KEY_EOF" >> $GITHUB_ENV
+            echo "${{ secrets.GCP_VM_SSHKEY_CHACHA }}" >> $GITHUB_ENV
+            echo "KEY_EOF" >> $GITHUB_ENV
+            echo "DOCKER_USERNAME=${{secrets.DOCKER_USERNAME_CHACHA}}" >> $GITHUB_ENV
+            echo "DOCKER_PASSWORD=${{secrets.DOCKER_PASSWORD_CHACHA}}" >> $GITHUB_ENV
+          fi
+          if [ "${{github.ref}}" == 'refs/heads/deploy-lami' ]; then
+            echo "GCP_VM_HOST=${{secrets.GCP_VM_HOST_LAMI}}" >> $GITHUB_ENV
+            echo "GCP_VM_USERNAME=${{secrets.GCP_VM_USERNAME_LAMI}}" >> $GITHUB_ENV
+            echo "GCP_VM_SSHKEY<<KEY_EOF" >> $GITHUB_ENV
+            echo "${{ secrets.GCP_VM_SSHKEY_LAMI }}" >> $GITHUB_ENV
+            echo "KEY_EOF" >> $GITHUB_ENV
+            echo "DOCKER_USERNAME=${{secrets.DOCKER_USERNAME_LAMI}}" >> $GITHUB_ENV
+            echo "DOCKER_PASSWORD=${{secrets.DOCKER_PASSWORD_LAMI}}" >> $GITHUB_ENV
+          fi
+          if [ "${{github.ref}}" == 'refs/heads/deploy-kimgyubi' ]; then
+            echo "GCP_VM_HOST=${{secrets.GCP_VM_HOST_KIMGYUBI}}" >> $GITHUB_ENV
+            echo "GCP_VM_USERNAME=${{secrets.GCP_VM_USERNAME_KIMGYUBI}}" >> $GITHUB_ENV
+            echo "GCP_VM_SSHKEY<<KEY_EOF" >> $GITHUB_ENV
+            echo "${{ secrets.GCP_VM_SSHKEY_KIMGYUBI }}" >> $GITHUB_ENV
+            echo "KEY_EOF" >> $GITHUB_ENV
+            echo "DOCKER_USERNAME=${{secrets.DOCKER_USERNAME_KIMGYUBI}}" >> $GITHUB_ENV
+            echo "DOCKER_PASSWORD=${{secrets.DOCKER_PASSWORD_KIMGYUBI}}" >> $GITHUB_ENV
+          fi
+          
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ env.GCP_VM_SSHKEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # 검증
+          ssh-keygen -l -f ~/.ssh/id_rsa || echo "Invalid key format"
+          
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{github.ref}}
+          
+      # 시크릿 주입 줄은 뺐다 — clov-api는 시크릿을 이미지에 넣지 않고 VM의
+      # /app/application-secret.yaml 에 마운트한다. .dockerignore가 그 파일을
+      # 빌드 컨텍스트에서 제외하므로 여기서 만들어도 이미지에 들어가지 않는다.
+      # 빌드(Gradle)는 Dockerfile이 멀티스테이지로 안에서 수행한다.
+      - name: Springboot Build and Docker image build and push
+        run: |
+          echo "${{env.DOCKER_PASSWORD}}" | docker login -u ${{env.DOCKER_USERNAME}} --password-stdin
+          docker build -t ${{env.DOCKER_USERNAME}}/springboot-app:latest .
+          docker push ${{env.DOCKER_USERNAME}}/springboot-app:latest
+
+      - name: GCP SSH REMOTE 원격접속
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{env.GCP_VM_HOST}}
+          username: ${{env.GCP_VM_USERNAME}}
+          key: ${{env.GCP_VM_SSHKEY}}
+          script: |
+            cd /home/${{env.GCP_VM_USERNAME}}
+            sudo docker compose -f api-docker-compose.yaml pull
+            sudo docker compose -f api-docker-compose.yaml down
+            sudo docker compose -f api-docker-compose.yaml up -d
+
+
+            
+        
