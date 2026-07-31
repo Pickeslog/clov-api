@@ -303,10 +303,19 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void imageQuotaReturns507WhenExceeded() throws Exception {
+        // 8 = 계약 확정값(screen-spec-source/03-memory-feed-screen.md, 리더 결정 2026-07-30).
+        // 프론트(clov-web Feed.jsx MEMORY_PHOTO_LIMIT)와 같은 값이어야 한다 — 여기가 낮으면
+        // 화면에서 고를 수 있는 사진이 업로드에서 507로 튕긴다(프론트 15 vs 서버 10이었다).
+        // 상수를 바꾸면 이 테스트가 먼저 깨지도록 경계(8 성공 / 9번째 507)를 그대로 확인한다.
         long memoryId = createFreeMemory();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 8; i++) {
             commitImage(memoryId, "https://cdn.test/q" + i + ".jpg");
         }
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.images.length()").value(8));
+
         mockMvc.perform(post("/api/v1/memories/{memoryId}/images/presign", memoryId)
                         .header("Authorization", "Bearer " + writerToken)
                         .contentType(MediaType.APPLICATION_JSON)

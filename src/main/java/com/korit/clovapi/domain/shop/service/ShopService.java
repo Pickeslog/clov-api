@@ -25,8 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ShopService {
 
-    /** 지갑 최초 생성 시 지급하는 시작 골드. 기존 원장 데이터(SIGNUP_GRANT=20000)와 맞춘 값. */
-    static final long SIGNUP_GRANT_AMOUNT = 20000;
+    /**
+     * 지갑 최초 생성 시 지급하는 시작 골드 (계약 §15-1 (2), 리더 확정 2026-07-30).
+     *
+     * ⚠️ 카탈로그 총액에 가깝게 올리지 말 것. 이전 값 20,000은 설계값이 아니라 개발 DB의
+     * 테스트 원장 데이터에 코드를 맞춘 숫자였는데, 카탈로그 총액(42,260)의 절반이라
+     * 가입 즉시 절반을 살 수 있었다 — 그러면 §15-4의 획득 규칙(하루 500)이 무의미해진다.
+     * 1,000은 가장 싼 코스튬(600G) 하나를 바로 사고 두 번째는 못 사는 금액이다.
+     */
+    static final long SIGNUP_GRANT_AMOUNT = 1000;
 
     private final ShopMapper shopMapper;
     private final UserPreferenceMapper preferenceMapper;
