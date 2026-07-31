@@ -80,7 +80,7 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                         .header("Authorization", "Bearer " + token)
                         .param("category", "COSTUME"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[?(@.id=='" + cheapItemId + "')].owned").value(java.util.List.of(false)));
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + cheapItemId + "')].owned").value(false));
     }
 
     @Test
