@@ -70,7 +70,9 @@ class ShopIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/shop/wallet")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.balance").value(20000));
+                // 계약 §15-1 (2) 시작 골드 1,000. 카탈로그 총액(42,260)에 가깝게 올리면
+                // §15-4 획득 규칙이 무의미해지므로 이 값이 바뀌면 계약을 먼저 고쳐야 한다.
+                .andExpect(jsonPath("$.data.balance").value(1000));
 
         String grantReason = jdbcTemplate.queryForObject(
                 "SELECT reason FROM wallet_transactions WHERE user_id = ?", String.class, userId);
@@ -90,12 +92,12 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.item.id").value(String.valueOf(cheapItemId)))
                 .andExpect(jsonPath("$.data.item.owned").value(true))
-                .andExpect(jsonPath("$.data.balance").value(19900));
+                .andExpect(jsonPath("$.data.balance").value(900));
 
         mockMvc.perform(get("/api/v1/shop/wallet")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.balance").value(19900));
+                .andExpect(jsonPath("$.data.balance").value(900));
 
         mockMvc.perform(get("/api/v1/shop/inventory")
                         .header("Authorization", "Bearer " + token))

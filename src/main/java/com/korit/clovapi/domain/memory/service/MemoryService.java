@@ -44,8 +44,12 @@ import java.util.stream.Collectors;
 public class MemoryService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
-    // 쿼터 상한(memory당 장수) — 계약 미정, 리더 확정 시 이 값만 교체(#45).
-    private static final int MAX_IMAGES_PER_MEMORY = 10;
+    // 쿼터 상한(memory당 장수) — 8로 확정(리더 결정 2026-07-30,
+    // screen-spec-source/03-memory-feed-screen.md §입력 제약). 프로토타입은 30이지만 프로덕션은
+    // 추억마다 R2에 실제 파일이 올라가서 저장 쿼터 도달 속도가 4배 가까이 빨라진다.
+    // 프론트(clov-web Feed.jsx MEMORY_PHOTO_LIMIT)와 같은 값이어야 한다 — 여기가 낮으면
+    // 화면에서 고를 수 있는 사진이 업로드에서 507로 튕긴다(실제로 프론트 15 vs 여기 10이었다).
+    private static final int MAX_IMAGES_PER_MEMORY = 8;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;

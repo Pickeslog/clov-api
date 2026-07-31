@@ -166,6 +166,42 @@ class UserIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.darkMode").value(true));
     }
 
+    // 계약 §5의 허용값 표를 서버가 실제로 막는지 본다. 검증이 없으면 표에 없는 값이 그대로
+    // 저장되는데 에러가 안 나고 화면에서만 조용히 깨진다 — 프론트가 아는 값이 아니면
+    // 기본값으로 떨어뜨려서, 사용자에게는 설정이 이유 없이 되돌아간 것으로 보인다.
+    @Test
+    void preferencesRejectValuesOutsideTheContractAllowList() throws Exception {
+        String[] rejected = {
+                "{\"mascotType\":\"aaaa\"}",
+                "{\"mascotType\":\"robot\"}",      // 계약에 잘못 적혀 있던 옛 값 — 저장값은 rob이다
+                "{\"memoryCardTheme\":\"coverflow\"}", // 프로토타입 내부 이름 — 프로덕션은 stack
+                "{\"letterTheme\":\"envelope\"}",
+        };
+        for (String body : rejected) {
+            mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        }
+
+        // 거부된 요청이 하나도 반영되지 않았는지 — 부분 수정이라 다른 필드까지 오염되면 안 된다
+        mockMvc.perform(get("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mascotType").value("crobi"))
+                .andExpect(jsonPath("$.data.memoryCardTheme").value("stack"))
+                .andExpect(jsonPath("$.data.letterTheme").value("postbox"));
+
+        // 허용값 3종은 통과한다
+        for (String mascot : new String[]{"crobi", "rob", "burgerOldman"}) {
+            mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"mascotType\":\"" + mascot + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.mascotType").value(mascot));
+        }
+    }
+
     private String bearer() {
         return "Bearer " + accessToken;
     }
