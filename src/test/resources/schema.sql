@@ -38,6 +38,7 @@ CREATE TABLE user_preferences (
   letter_theme          VARCHAR(20)  NULL COMMENT '선물상자/우체통',
   memory_card_theme     VARCHAR(20)  NULL COMMENT '빨랫줄/겹침/일기장',
   mascot_type           VARCHAR(20)  NOT NULL DEFAULT 'crobi' COMMENT 'crobi/rob',
+  equipped_item_id      BIGINT       NULL COMMENT '장착 중인 shop_items.id(COSTUME만), NULL=미장착. FK는 shop_items 생성 후 아래에서 추가',
   updated_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id),
   CONSTRAINT fk_user_prefs_user FOREIGN KEY (user_id) REFERENCES users(id)
@@ -332,3 +333,62 @@ CREATE TABLE password_reset_tokens (
   KEY idx_password_reset_tokens_user (user_id),
   CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 20. SHOP_ITEMS ✨ (상점 카탈로그 — SSOT 미등록. 개발 DB에 이미 존재하는 실스키마를 그대로 반영)
+CREATE TABLE shop_items (
+  id             BIGINT       NOT NULL AUTO_INCREMENT,
+  code           VARCHAR(50)  NOT NULL,
+  name           VARCHAR(100) NOT NULL,
+  description    VARCHAR(200) NULL,
+  category       VARCHAR(20)  NOT NULL COMMENT 'COSTUME/SKIN/EVENT',
+  rarity         VARCHAR(20)  NOT NULL COMMENT 'COMMON/UNCOMMON/RARE/EPIC/LEGENDARY',
+  price          INT          NOT NULL,
+  discount_rate  INT          NOT NULL DEFAULT 0,
+  image_url      VARCHAR(512) NULL,
+  status         VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+  sort_order     INT          NOT NULL DEFAULT 0,
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_shop_items_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 21. USER_WALLETS ✨ (골드는 사용자 단위 — 방과 무관)
+CREATE TABLE user_wallets (
+  user_id     BIGINT   NOT NULL,
+  balance     INT      NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_user_wallets_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 22. USER_INVENTORY_ITEMS ✨ (보유함)
+CREATE TABLE user_inventory_items (
+  id            BIGINT   NOT NULL AUTO_INCREMENT,
+  user_id       BIGINT   NOT NULL,
+  item_id       BIGINT   NOT NULL,
+  paid_price    INT      NOT NULL,
+  purchased_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_user_inventory_items_user_item (user_id, item_id),
+  CONSTRAINT fk_user_inventory_items_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_user_inventory_items_item FOREIGN KEY (item_id) REFERENCES shop_items(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE)
+CREATE TABLE wallet_transactions (
+  id             BIGINT      NOT NULL AUTO_INCREMENT,
+  user_id        BIGINT      NOT NULL,
+  reason         VARCHAR(30) NOT NULL,
+  amount         INT         NOT NULL,
+  balance_after  INT         NOT NULL,
+  reference_id   BIGINT      NULL,
+  created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_wallet_transactions_user (user_id, created_at),
+  CONSTRAINT fk_wallet_transactions_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE user_preferences
+  ADD CONSTRAINT fk_user_preferences_equipped_item FOREIGN KEY (equipped_item_id) REFERENCES shop_items(id);

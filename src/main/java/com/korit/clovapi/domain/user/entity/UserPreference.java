@@ -9,6 +9,9 @@ public class UserPreference {
     private String letterTheme;
     private String memoryCardTheme;
     private String mascotType;
+    private Long equippedItemId;
+    private String equippedItemName;
+    private String equippedItemImageUrl;
 
     public Boolean getDarkMode() { return darkMode; }
     public void setDarkMode(Boolean darkMode) { this.darkMode = darkMode; }
@@ -24,4 +27,10 @@ public class UserPreference {
     public void setMemoryCardTheme(String memoryCardTheme) { this.memoryCardTheme = memoryCardTheme; }
     public String getMascotType() { return mascotType; }
     public void setMascotType(String mascotType) { this.mascotType = mascotType; }
+    public Long getEquippedItemId() { return equippedItemId; }
+    public void setEquippedItemId(Long equippedItemId) { this.equippedItemId = equippedItemId; }
+    public String getEquippedItemName() { return equippedItemName; }
+    public void setEquippedItemName(String equippedItemName) { this.equippedItemName = equippedItemName; }
+    public String getEquippedItemImageUrl() { return equippedItemImageUrl; }
+    public void setEquippedItemImageUrl(String equippedItemImageUrl) { this.equippedItemImageUrl = equippedItemImageUrl; }
 }
