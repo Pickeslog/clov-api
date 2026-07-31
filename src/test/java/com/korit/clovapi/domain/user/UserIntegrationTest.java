@@ -153,7 +153,17 @@ class UserIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.darkMode").value(true))
                 .andExpect(jsonPath("$.data.customColor").value("#7CC6A6"))
+                // 안 보낸 필드는 그대로 남는다 — 이게 부분 수정의 핵심이라 지우지 않는다
                 .andExpect(jsonPath("$.data.mascotType").value("crobi"));
+
+        // 세 번째 캐릭터(버거노인)까지 왕복하는지는 따로 본다. mascotType만 보내고
+        // 앞서 넣은 darkMode가 살아 있는지도 같이 확인해 반대 방향 부분 수정을 덮는다.
+        mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mascotType\":\"burgerOldman\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mascotType").value("burgerOldman"))
+                .andExpect(jsonPath("$.data.darkMode").value(true));
     }
 
     private String bearer() {
