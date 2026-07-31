@@ -85,6 +85,45 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", writerId, otherId);
     }
 
+    // 계약 §10 `title` ≤ 40. 목업(space.js:169)과 프론트 maxLength가 40이라 여기가 낮으면
+    // 사용자가 화면에서 입력할 수 있는 제목이 저장 시 400으로 튕긴다(clov-web #148/#185).
+    // 작성·수정 양쪽을 함께 본다 — 한쪽만 낮으면 수정 모드에서만 터져서 원인이 안 보인다.
+    @Test
+    void memoryTitleAcceptsFortyCharactersAndRejectsMore() throws Exception {
+        String forty = "가".repeat(40);
+        String fortyOne = "가".repeat(41);
+
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"" + forty + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.title").value(forty))
+                .andReturn();
+        long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"" + fortyOne + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"" + forty + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value(forty));
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"" + fortyOne + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
     @Test
     void freeMemoryLifecycleFollowsTheContract() throws Exception {
         MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)

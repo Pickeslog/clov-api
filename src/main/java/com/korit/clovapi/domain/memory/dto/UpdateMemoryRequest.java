@@ -11,7 +11,8 @@ import java.util.Set;
 
 public class UpdateMemoryRequest {
 
-    @Size(max = 25)
+    // CreateMemoryRequest와 같은 값이어야 한다 — 한쪽만 낮으면 수정 모드에서만 400이 난다.
+    @Size(max = 40)
     private String title;
     @Size(max = 100)
     private String content;
