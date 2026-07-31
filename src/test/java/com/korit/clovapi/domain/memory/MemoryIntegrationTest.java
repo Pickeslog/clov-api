@@ -399,6 +399,183 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items.length()").value(2));
     }
 
+    // clov-api#98 — 삭제 시 plan.memory_status를 되돌리되 다른 멤버 기록이 남아 있으면 건드리지
+    // 않는다. 되돌아온 뒤엔 재작성이 500이 아니라 정상 처리(같은 행을 되살림)되어야 한다.
+    @Test
+    void deletingPlanMemoryRevertsStatusUnlessOtherMemberStillHasOneAndRewriteRevivesInstead() throws Exception {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO plans (room_id, writer_id, title, status, memory_status) "
+                            + "VALUES (?, ?, 'Camping', 'COMPLETED', 'CANDIDATE')",
+                    Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, roomId);
+            ps.setLong(2, writerId);
+            return ps;
+        }, keyHolder);
+        planId = keyHolder.getKey().longValue();
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", roomId, otherId);
+
+        MvcResult writerCreated = mockMvc.perform(post("/api/v1/plans/{planId}/memories", planId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Camping v1\",\"content\":\"first\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long writerMemoryId = Long.parseLong(JsonPath.read(writerCreated.getResponse().getContentAsString(), "$.data.id"));
+        commitImage(writerMemoryId, "https://cdn.test/before-delete.jpg");
+
+        mockMvc.perform(post("/api/v1/plans/{planId}/memories", planId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Camping (other view)\",\"content\":\"also there\"}"))
+                .andExpect(status().isCreated());
+
+        // 작성자만 삭제 — 다른 멤버(other) 기록이 살아 있으므로 WRITTEN 유지.
+        mockMvc.perform(delete("/api/v1/memories/{memoryId}", writerMemoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals("WRITTEN",
+                jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planId));
+
+        // 재작성 시도 — 고치기 전이었으면 uk_memories_plan_writer 위반으로 500이 났다.
+        MvcResult revived = mockMvc.perform(post("/api/v1/plans/{planId}/memories", planId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Camping v2\",\"content\":\"rewritten\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.title").value("Camping v2"))
+                .andReturn();
+        long revivedMemoryId = Long.parseLong(JsonPath.read(revived.getResponse().getContentAsString(), "$.data.id"));
+        // 같은 행이 되살아난 것이지 새 행이 아니다.
+        org.junit.jupiter.api.Assertions.assertEquals(writerMemoryId, revivedMemoryId);
+
+        // 삭제 전 사진은 새 기록에 이어받지 않는다(빈 상태로 되살아남).
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", revivedMemoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.images.length()").value(0));
+
+        // 재작성으로 다시 WRITTEN.
+        org.junit.jupiter.api.Assertions.assertEquals("WRITTEN",
+                jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planId));
+
+        // 이제 두 기록 다 지우면 — 아무도 안 남았으니 CANDIDATE로 되돌아간다.
+        mockMvc.perform(delete("/api/v1/memories/{memoryId}", revivedMemoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals("WRITTEN",
+                jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planId));
+
+        mockMvc.perform(get("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1)); // other의 기록만 남음
+    }
+
+    // clov-api#98 — PATCH planId로 연결/이동/해제. 완료 안 된 약속·중복·다른 방 약속은 거부되고,
+    // 옛 약속은 마지막 기록이 떠나면 CANDIDATE로 되돌아간다.
+    @Test
+    void updatingMemoryPlanLinkConnectsMovesDetachesAndRejectsInvalidTargets() throws Exception {
+        long memoryId = createFreeMemory();
+        long planA = insertPlan(roomId, "CANDIDATE");
+        long planB = insertPlan(roomId, "CANDIDATE");
+        long planIncomplete = insertPlan(roomId, "NONE");
+
+        try {
+            // 연결.
+            mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"planId\":\"" + planA + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.planId").value(String.valueOf(planA)));
+            org.junit.jupiter.api.Assertions.assertEquals("WRITTEN",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planA));
+
+            // 미완료 약속으로 연결 시도 → 409.
+            long memory2 = createFreeMemory();
+            mockMvc.perform(patch("/api/v1/memories/{memoryId}", memory2)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"planId\":\"" + planIncomplete + "\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("PLAN_NOT_COMPLETED"));
+
+            // 이미 내가 planA를 쓴 상태 → 다른 추억으로 또 연결 시도하면 409.
+            mockMvc.perform(patch("/api/v1/memories/{memoryId}", memory2)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"planId\":\"" + planA + "\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("MEMORY_ALREADY_WRITTEN"));
+
+            // 이동 — planA에서 planB로. planA는 아무도 안 남았으니 CANDIDATE로 되돌아간다.
+            mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"planId\":\"" + planB + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.planId").value(String.valueOf(planB)));
+            org.junit.jupiter.api.Assertions.assertEquals("CANDIDATE",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planA));
+            org.junit.jupiter.api.Assertions.assertEquals("WRITTEN",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planB));
+
+            // 해제 — planB도 CANDIDATE로.
+            mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"planId\":null}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.planId").doesNotExist());
+            org.junit.jupiter.api.Assertions.assertEquals("CANDIDATE",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planB));
+
+            // 다른 방 약속으로 연결 시도 → 존재하지 않는 것처럼 404.
+            long otherRoomId = createRoom(writerToken, "Other Room");
+            long otherRoomPlan = insertPlan(otherRoomId, "CANDIDATE");
+            try {
+                mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                                .header("Authorization", "Bearer " + writerToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"planId\":\"" + otherRoomPlan + "\"}"))
+                        .andExpect(status().isNotFound());
+            } finally {
+                jdbcTemplate.update("DELETE FROM plans WHERE id = ?", otherRoomPlan);
+                jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", otherRoomId);
+                jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", otherRoomId);
+            }
+        } finally {
+            jdbcTemplate.update("DELETE FROM plans WHERE id IN (?, ?, ?)", planA, planB, planIncomplete);
+        }
+    }
+
+    private long insertPlan(long forRoomId, String memoryStatus) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO plans (room_id, writer_id, title, status, memory_status) "
+                            + "VALUES (?, ?, 'Plan', 'COMPLETED', ?)",
+                    Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, forRoomId);
+            ps.setLong(2, writerId);
+            ps.setString(3, memoryStatus);
+            return ps;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
+    }
+
+    private long createRoom(String token, String name) throws Exception {
+        MvcResult room = mockMvc.perform(post("/api/v1/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + name + "\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return Long.parseLong(JsonPath.read(room.getResponse().getContentAsString(), "$.data.id"));
+    }
+
     private long createFreeMemory() throws Exception {
         MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
                         .header("Authorization", "Bearer " + writerToken)

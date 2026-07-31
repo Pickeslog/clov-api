@@ -52,4 +52,8 @@
     <delete id="delete">
         DELETE FROM memory_comments WHERE id = #{commentId}
     </delete>
+
+    <delete id="deleteByMemoryId">
+        DELETE FROM memory_comments WHERE memory_id = #{memoryId}
+    </delete>
 </mapper>

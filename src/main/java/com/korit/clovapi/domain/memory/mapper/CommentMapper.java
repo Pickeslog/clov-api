@@ -23,4 +23,8 @@ public interface CommentMapper {
     void update(@Param("commentId") long commentId, @Param("content") String content);
 
     void delete(@Param("commentId") long commentId);
+
+    /** clov-api#98 — 소프트 삭제된 추억을 되살릴 때, 삭제 전 친구 메시지는 새 내용에 이어받지 않는다.
+     * 완전히 다른 내용으로 다시 쓴 추억에 옛 댓글이 그대로 붙어 있으면 맥락이 안 맞는다. */
+    void deleteByMemoryId(@Param("memoryId") long memoryId);
 }

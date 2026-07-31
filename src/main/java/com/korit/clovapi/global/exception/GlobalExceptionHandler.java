@@ -3,6 +3,7 @@ package com.korit.clovapi.global.exception;
 import com.korit.clovapi.global.response.ApiResponse;
 import com.korit.clovapi.global.response.ApiErrorDetail;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -57,6 +58,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<ApiResponse<Void>> handleNotFoundException(Exception exception) {
         return failure(ErrorCode.NOT_FOUND);
+    }
+
+    // 유니크 제약 위반의 최종 방어선(clov-api#98) — 도메인 서비스가 미리 막지 못한 경합(동시 요청)
+    // 등으로 DB가 대신 막을 때 500이 아니라 409로 나가게 한다. Exception.class보다 먼저 매칭된다.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(
+            DataIntegrityViolationException exception
+    ) {
+        return failure(ErrorCode.DUPLICATE_RESOURCE);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

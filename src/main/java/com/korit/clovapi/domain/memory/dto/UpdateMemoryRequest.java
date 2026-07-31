@@ -19,6 +19,9 @@ public class UpdateMemoryRequest {
     private LocalDate memoryDate;
     private List<@Size(max = 50) String> tags;
     private List<String> participantUserIds;
+    // 약속 연결 변경/해제(clov-api#98). "필드를 안 보냄"과 "planId: null을 보냄(해제)"을 providedFields로
+    // 구분한다 — 안 보내면 그대로 두고, null을 보내면 자유 기록(FREE MEMORY)으로 해제한다.
+    private String planId;
     @JsonIgnore
     private final Set<String> providedFields = new HashSet<>();
 
@@ -35,6 +38,8 @@ public class UpdateMemoryRequest {
         this.participantUserIds = participantUserIds;
         providedFields.add("participantUserIds");
     }
+    public String getPlanId() { return planId; }
+    public void setPlanId(String planId) { this.planId = planId; providedFields.add("planId"); }
     public boolean has(String field) { return providedFields.contains(field); }
 
     @JsonIgnore

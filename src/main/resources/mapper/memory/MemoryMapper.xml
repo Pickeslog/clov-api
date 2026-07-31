@@ -43,13 +43,15 @@
         WHERE m.id = #{memoryId} AND m.deleted_at IS NULL
     </select>
 
+    <!-- 삭제분 포함(clov-api#98) — deleted_at 필터를 빼서 소프트 삭제된 행도 찾는다.
+         활성/삭제 구분은 호출부가 deletedAt으로 한다. -->
     <select id="findByPlanIdAndWriterId" resultMap="memoryResultMap">
         SELECT m.id, m.room_id, m.plan_id, m.writer_id, u.nickname AS writer_nickname,
                u.profile_image_url AS writer_profile_image_url, m.title, m.content, m.memory_date,
                m.deleted_at, m.created_at, m.updated_at
         FROM memories m
         JOIN users u ON u.id = m.writer_id
-        WHERE m.plan_id = #{planId} AND m.writer_id = #{writerId} AND m.deleted_at IS NULL
+        WHERE m.plan_id = #{planId} AND m.writer_id = #{writerId}
     </select>
 
     <select id="findPlanRoomId" resultType="long">
@@ -62,6 +64,25 @@
 
     <update id="updatePlanMemoryStatusWritten">
         UPDATE plans SET memory_status = 'WRITTEN' WHERE id = #{planId}
+    </update>
+
+    <update id="updatePlanMemoryStatus">
+        UPDATE plans SET memory_status = #{status} WHERE id = #{planId}
+    </update>
+
+    <select id="countActiveByPlanId" resultType="int">
+        SELECT COUNT(*) FROM memories WHERE plan_id = #{planId} AND deleted_at IS NULL
+    </select>
+
+    <update id="revive">
+        UPDATE memories
+        SET deleted_at = NULL, title = #{title}, content = #{content}, memory_date = #{memoryDate},
+            created_at = #{createdAt}
+        WHERE id = #{memoryId}
+    </update>
+
+    <update id="updateMemoryPlanId">
+        UPDATE memories SET plan_id = #{planId} WHERE id = #{memoryId}
     </update>
 
     <select id="findFeed" resultMap="memoryResultMap">
