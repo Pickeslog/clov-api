@@ -591,33 +591,32 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
     // PlanService.skip()에 상태 가드가 없어서 WRITTEN인 약속도 SKIPPED가 될 수 있다.
     @Test
     void deletingMemoryDoesNotUndoSkippedPlanStatus() throws Exception {
-        long skippedPlan = insertPlan(roomId, "CANDIDATE");
-        try {
-            MvcResult created = mockMvc.perform(post("/api/v1/plans/{planId}/memories", skippedPlan)
-                            .header("Authorization", "Bearer " + writerToken)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"title\":\"Trip\",\"content\":\"went\"}"))
-                    .andExpect(status().isCreated())
-                    .andReturn();
-            long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+        // 클래스 필드에 담아 @AfterEach가 정리하게 한다 — 추억은 소프트 삭제라 행이 남아 있어서,
+        // memories보다 plans를 먼저 지우면 FK 제약에 걸린다(cleanUp이 그 순서를 지킨다).
+        planId = insertPlan(roomId, "CANDIDATE");
 
-            // 다른 멤버가 (stale UI로) 스킵을 누른 상황 — skip()은 WRITTEN이어도 막지 않는다.
-            mockMvc.perform(post("/api/v1/plans/{planId}/skip-memory", skippedPlan)
-                            .header("Authorization", "Bearer " + writerToken))
-                    .andExpect(status().isOk());
-            org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
-                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, skippedPlan));
+        MvcResult created = mockMvc.perform(post("/api/v1/plans/{planId}/memories", planId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Trip\",\"content\":\"went\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
 
-            mockMvc.perform(delete("/api/v1/memories/{memoryId}", memoryId)
-                            .header("Authorization", "Bearer " + writerToken))
-                    .andExpect(status().isOk());
+        // 다른 멤버가 (stale UI로) 스킵을 누른 상황 — skip()은 WRITTEN이어도 막지 않는다.
+        mockMvc.perform(post("/api/v1/plans/{planId}/skip-memory", planId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
+                jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planId));
 
-            // 고치기 전이었으면 여기서 CANDIDATE가 되어 스킵이 조용히 풀렸다.
-            org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
-                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, skippedPlan));
-        } finally {
-            jdbcTemplate.update("DELETE FROM plans WHERE id = ?", skippedPlan);
-        }
+        mockMvc.perform(delete("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk());
+
+        // 고치기 전이었으면 여기서 CANDIDATE가 되어 스킵이 조용히 풀렸다.
+        org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
+                jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, planId));
     }
 
     private long insertPlan(long forRoomId, String memoryStatus) {
