@@ -551,6 +551,75 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    // 요청 본문의 문자열 ID가 숫자가 아니면 400이어야 한다. Long.parseLong을 그대로 태우면
+    // NumberFormatException이 @ExceptionHandler(Exception.class)까지 올라가 500이 난다.
+    @Test
+    void nonNumericIdsInRequestBodyAreRejectedWith400() throws Exception {
+        long memoryId = createFreeMemory();
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planId\":\"abc\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+        // long 범위를 넘는 숫자도 같은 경로다(자릿수만 맞으면 통과하는 정규식으로는 못 막는다).
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planId\":\"99999999999999999999\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"participantUserIds\":[\"abc\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"T\",\"content\":\"c\",\"participantUserIds\":[\"abc\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    // 'SKIPPED'는 "이 약속은 추억을 안 남긴다"는 사용자 결정이라 추억을 지워도 되돌리면 안 된다.
+    // PlanService.skip()에 상태 가드가 없어서 WRITTEN인 약속도 SKIPPED가 될 수 있다.
+    @Test
+    void deletingMemoryDoesNotUndoSkippedPlanStatus() throws Exception {
+        long skippedPlan = insertPlan(roomId, "CANDIDATE");
+        try {
+            MvcResult created = mockMvc.perform(post("/api/v1/plans/{planId}/memories", skippedPlan)
+                            .header("Authorization", "Bearer " + writerToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"Trip\",\"content\":\"went\"}"))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+            long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+            // 다른 멤버가 (stale UI로) 스킵을 누른 상황 — skip()은 WRITTEN이어도 막지 않는다.
+            mockMvc.perform(post("/api/v1/plans/{planId}/skip-memory", skippedPlan)
+                            .header("Authorization", "Bearer " + writerToken))
+                    .andExpect(status().isOk());
+            org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, skippedPlan));
+
+            mockMvc.perform(delete("/api/v1/memories/{memoryId}", memoryId)
+                            .header("Authorization", "Bearer " + writerToken))
+                    .andExpect(status().isOk());
+
+            // 고치기 전이었으면 여기서 CANDIDATE가 되어 스킵이 조용히 풀렸다.
+            org.junit.jupiter.api.Assertions.assertEquals("SKIPPED",
+                    jdbcTemplate.queryForObject("SELECT memory_status FROM plans WHERE id = ?", String.class, skippedPlan));
+        } finally {
+            jdbcTemplate.update("DELETE FROM plans WHERE id = ?", skippedPlan);
+        }
+    }
+
     private long insertPlan(long forRoomId, String memoryStatus) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
