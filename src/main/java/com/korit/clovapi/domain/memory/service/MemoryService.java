@@ -24,6 +24,8 @@ import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
 import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.domain.room.service.RoomService;
+import com.korit.clovapi.domain.shop.entity.WalletTransaction;
+import com.korit.clovapi.domain.shop.service.ShopService;
 import com.korit.clovapi.global.dto.PresignRequest;
 import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.dto.UserSummaryResponse;
@@ -51,6 +53,10 @@ public class MemoryService {
     // 프론트(clov-web Feed.jsx MEMORY_PHOTO_LIMIT)와 같은 값이어야 한다 — 여기가 낮으면
     // 화면에서 고를 수 있는 사진이 업로드에서 507로 튕긴다(실제로 프론트 15 vs 여기 10이었다).
     private static final int MAX_IMAGES_PER_MEMORY = 8;
+    // 약속 연결 추억(createFromPlan) 등록 1건당 지급 골드(계약 §15-4). FREE MEMORY(createFree,
+    // plan_id NULL)는 지급 대상이 아니다 — 약속·완료·다른 참여자 없이 혼자 무한히 쓸 수 있어서
+    // 캡이 없는 지급을 걸면 그대로 무한 골드가 된다. 일일 총 상한(ShopService.DAILY_EARN_CAP)만 적용.
+    private static final long MEMORY_WRITE_GOLD = 50;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;
@@ -59,10 +65,11 @@ public class MemoryService {
     private final StoragePresigner storagePresigner;
     private final ExpService expService;
     private final NotificationService notificationService;
+    private final ShopService shopService;
 
     public MemoryService(MemoryMapper memoryMapper, RoomService roomService, CommentMapper commentMapper,
                          MemoryImageMapper memoryImageMapper, StoragePresigner storagePresigner,
-                         ExpService expService, NotificationService notificationService) {
+                         ExpService expService, NotificationService notificationService, ShopService shopService) {
         this.memoryMapper = memoryMapper;
         this.roomService = roomService;
         this.commentMapper = commentMapper;
@@ -70,6 +77,7 @@ public class MemoryService {
         this.storagePresigner = storagePresigner;
         this.expService = expService;
         this.notificationService = notificationService;
+        this.shopService = shopService;
     }
 
     @Transactional
@@ -110,6 +118,7 @@ public class MemoryService {
         memoryMapper.updatePlanMemoryStatusWritten(planId);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        shopService.earnGold(userId, WalletTransaction.REASON_EARN_MEMORY, MEMORY_WRITE_GOLD, memory.getId());
         notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
                 NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
         return getDetail(memory.getId(), userId);
@@ -124,6 +133,7 @@ public class MemoryService {
         saveTagsAndParticipants(memory.getId(), request);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        // FREE MEMORY는 골드를 지급하지 않는다(계약 §15-4) — createFromPlan 쪽 주석 참고.
         notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
                 NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
         return getDetail(memory.getId(), userId);

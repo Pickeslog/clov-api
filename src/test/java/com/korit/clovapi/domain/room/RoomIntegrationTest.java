@@ -59,6 +59,10 @@ class RoomIntegrationTest extends IntegrationTestSupport {
             jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", createdRoomId);
         }
         for (Long createdUserId : userIds) {
+            // 마스코트 교감이 골드도 지급하면서(§15-4) 이 테스트 유저들도 user_wallets 행을 갖게 됐다 —
+            // 지우지 않으면 users DELETE가 FK(fk_wallet_transactions_user/fk_user_wallets_user)에 걸린다.
+            jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", createdUserId);
+            jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", createdUserId);
             jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", createdUserId);
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", createdUserId);
         }

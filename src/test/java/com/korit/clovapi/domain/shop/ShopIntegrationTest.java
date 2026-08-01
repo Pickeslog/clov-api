@@ -78,11 +78,16 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 "SELECT reason FROM wallet_transactions WHERE user_id = ?", String.class, userId);
         org.junit.jupiter.api.Assertions.assertEquals("SIGNUP_GRANT", grantReason);
 
+        // findCatalog은 sort_order,id 오름차순이라 COSTUME 두 개(cheapItemId·expensiveItemId) 중
+        // cheapItemId가 항상 0번 인덱스다. 필터식 jsonPath($.items[?(@.id=='13')])는 id가 숫자로만
+        // 이뤄진 문자열일 때 jayway/json-path가 비교 리터럴을 숫자로 오인해 매칭에 실패한다
+        // (응답 바디엔 값이 정확히 들어있는데도 항상 null로 평가됨) — 인덱스 경로로 우회한다.
         mockMvc.perform(get("/api/v1/shop/items")
                         .header("Authorization", "Bearer " + token)
                         .param("category", "COSTUME"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[?(@.id=='" + cheapItemId + "')].owned").value(false));
+                .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(cheapItemId)))
+                .andExpect(jsonPath("$.data.items[0].owned").value(false));
     }
 
     @Test
