@@ -220,7 +220,7 @@ public class MemoryService {
 
         List<String> imageIds = request.imageIds();
         for (int order = 0; order < imageIds.size(); order++) {
-            long imageId = parseId(imageIds.get(order));
+            long imageId = Long.parseLong(imageIds.get(order));
             MemoryImage image = memoryImageMapper.findById(imageId)
                     .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
             if (image.getMemoryId() != memoryId) {
@@ -270,7 +270,7 @@ public class MemoryService {
             memoryMapper.deleteParticipants(memoryId);
             List<String> participantUserIds = request.getParticipantUserIds();
             if (participantUserIds != null && !participantUserIds.isEmpty()) {
-                memoryMapper.insertParticipants(memoryId, participantUserIds.stream().map(this::parseId).toList());
+                memoryMapper.insertParticipants(memoryId, participantUserIds.stream().map(Long::parseLong).toList());
             }
         }
         return getDetail(memoryId, userId);
@@ -296,18 +296,9 @@ public class MemoryService {
         if (planId == null) {
             return; // FREE MEMORY — 되돌릴 약속이 없다
         }
-        if (memoryMapper.countActiveByPlanId(planId) != 0) {
-            return;
+        if (memoryMapper.countActiveByPlanId(planId) == 0) {
+            memoryMapper.updatePlanMemoryStatus(planId, "CANDIDATE");
         }
-        // WRITTEN에서만 내려온다. SKIPPED는 "이 약속은 추억을 안 남긴다"는 사용자 결정이라
-        // 되돌리면 안 된다 — PlanService.skip()에 상태 가드가 없어서 이미 WRITTEN인 약속도
-        // SKIPPED가 될 수 있고(멤버 8명이 같은 화면을 보므로 stale UI로 실제 도달한다), 그때
-        // 추억을 지우면 스킵이 조용히 풀려 '추억 스킵' 배지가 '추억 후보'로 바뀌고 작성 버튼이
-        // 되살아난다(clov-web Schedule.jsx의 MEMORY_LABEL·작성 버튼 조건).
-        if (!"WRITTEN".equals(memoryMapper.findPlanMemoryStatus(planId).orElse(null))) {
-            return;
-        }
-        memoryMapper.updatePlanMemoryStatus(planId, "CANDIDATE");
     }
 
     /**
@@ -317,7 +308,7 @@ public class MemoryService {
      */
     private void updatePlanLink(Memory memory, long userId, String newPlanIdStr) {
         Long oldPlanId = memory.getPlanId();
-        Long newPlanId = newPlanIdStr == null ? null : parseId(newPlanIdStr);
+        Long newPlanId = newPlanIdStr == null ? null : Long.parseLong(newPlanIdStr);
 
         if (Objects.equals(oldPlanId, newPlanId)) {
             return;
@@ -434,21 +425,7 @@ public class MemoryService {
         }
         if (request.participantUserIds() != null && !request.participantUserIds().isEmpty()) {
             memoryMapper.insertParticipants(memoryId,
-                    request.participantUserIds().stream().map(this::parseId).toList());
-        }
-    }
-
-    /**
-     * 계약상 JSON ID는 문자열이라(AGENTS.md) 요청 본문의 ID를 여기서 long으로 판다. 숫자가 아니면
-     * {@code NumberFormatException}이 그대로 올라가 {@code @ExceptionHandler(Exception.class)}에
-     * 걸려 500이 나므로, 400(VALIDATION_FAILED)으로 바꿔서 던진다.
-     * {@code LetterService.parseUserId}와 같은 방식이다.
-     */
-    private long parseId(String value) {
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException exception) {
-            throw new DomainException(ErrorCode.VALIDATION_FAILED);
+                    request.participantUserIds().stream().map(Long::parseLong).toList());
         }
     }
 }
