@@ -22,6 +22,9 @@ public enum ErrorCode {
     JOIN_REQUEST_UNDO_EXPIRED("JOIN_REQUEST_UNDO_EXPIRED", HttpStatus.CONFLICT, "가입 신청 되돌리기 시간이 만료되었습니다."),
     PLAN_NOT_COMPLETED("PLAN_NOT_COMPLETED", HttpStatus.CONFLICT, "완료되지 않은 약속에는 추억을 작성할 수 없습니다."),
     MEMORY_ALREADY_WRITTEN("MEMORY_ALREADY_WRITTEN", HttpStatus.CONFLICT, "이미 해당 약속의 추억을 작성했습니다."),
+    // 유니크 제약 위반의 최종 방어선(clov-api#98). 도메인별로 먼저 명확한 체크(예: MEMORY_ALREADY_WRITTEN)를
+    // 두는 게 원칙이고, 이건 경합(동시 요청) 등으로 그 체크를 빠져나갔을 때 500 대신 나가는 안전망이다.
+    DUPLICATE_RESOURCE("DUPLICATE_RESOURCE", HttpStatus.CONFLICT, "이미 존재하는 데이터와 충돌합니다."),
     COMMENT_ALREADY_EXISTS("COMMENT_ALREADY_EXISTS", HttpStatus.CONFLICT, "이미 이 추억에 한 줄 메시지를 남겼습니다."),
     STAGE_LOCKED("STAGE_LOCKED", HttpStatus.LOCKED, "이전 단계가 완료되지 않았습니다."),
     STAGE_ALREADY_UPLOADED("STAGE_ALREADY_UPLOADED", HttpStatus.CONFLICT, "해당 단계의 사진이 이미 등록되었습니다."),

@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -80,8 +81,27 @@ public class MemoryService {
         if ("NONE".equals(memoryStatus)) {
             throw new DomainException(ErrorCode.PLAN_NOT_COMPLETED);
         }
-        if (memoryMapper.findByPlanIdAndWriterId(planId, userId).isPresent()) {
-            throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN);
+
+        // clov-api#98 — findByPlanIdAndWriterId는 이제 삭제분도 본다. 활성 행이 있으면 기존대로 막고,
+        // 삭제된 행만 있으면 되살린다(지웠다 다시 쓰기가 500 없이 동작해야 한다). 이 경우 EXP/알림은
+        // 다시 주지 않는다 — 같은 행이 이미 처음 작성 때 받았다(재작성마다 EXP를 또 주면 삭제·재작성을
+        // 반복해 EXP를 무한정 채굴할 수 있다).
+        Memory existing = memoryMapper.findByPlanIdAndWriterId(planId, userId).orElse(null);
+        if (existing != null) {
+            if (existing.getDeletedAt() == null) {
+                throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN);
+            }
+            memoryMapper.revive(existing.getId(), request.title(), request.content(), request.memoryDate(),
+                    LocalDateTime.now(ZoneOffset.UTC));
+            // 삭제 전 사진·친구 메시지는 새 기록에 이어받지 않는다 — 완전히 다른 내용으로 다시
+            // 쓴 추억에 옛 첨부물이 그대로 붙어 있으면 맥락이 안 맞는다.
+            memoryImageMapper.deleteByMemoryId(existing.getId());
+            commentMapper.deleteByMemoryId(existing.getId());
+            memoryMapper.deleteTags(existing.getId());
+            memoryMapper.deleteParticipants(existing.getId());
+            saveTagsAndParticipants(existing.getId(), request);
+            memoryMapper.updatePlanMemoryStatusWritten(planId);
+            return getDetail(existing.getId(), userId);
         }
 
         Memory memory = buildMemory(roomId, planId, userId, request);
@@ -229,7 +249,16 @@ public class MemoryService {
         roomService.assertActiveMember(memory.getRoomId(), userId);
         assertWriter(memory, userId);
 
-        memoryMapper.update(memoryId, request);
+        if (request.has("planId")) {
+            updatePlanLink(memory, userId, request.getPlanId());
+        }
+
+        // planId만 보내는 요청(약속 연결 변경/해제 전용)도 있어서(clov-api#98), title·content·
+        // memoryDate가 하나도 없으면 이 UPDATE를 건너뛴다 — <set>에 채울 게 없으면 MyBatis가
+        // "UPDATE memories SET WHERE id=?"를 만들어 SQL 문법 오류가 난다(실제로 재현됨).
+        if (request.has("title") || request.has("content") || request.has("memoryDate")) {
+            memoryMapper.update(memoryId, request);
+        }
         if (request.has("tags")) {
             memoryMapper.deleteTags(memoryId);
             List<String> tags = request.getTags();
@@ -253,6 +282,67 @@ public class MemoryService {
         roomService.assertActiveMember(memory.getRoomId(), userId);
         assertWriter(memory, userId);
         memoryMapper.softDelete(memoryId, LocalDateTime.now(ZoneOffset.UTC));
+        revertPlanStatusIfEmpty(memory.getPlanId());
+    }
+
+    /**
+     * 약속 연결 추억이 전부 삭제/해제되면(clov-api#98) memory_status를 WRITTEN → CANDIDATE로
+     * 되돌린다. 다른 멤버가 그 약속에 남긴 추억이 하나라도 살아 있으면 손대지 않는다 — 우정공간은
+     * 한 약속에 여러 명이 각자 기록을 남기는 구조라(핵심 원칙), 한 사람이 지웠다고 약속 전체가
+     * "미기록"이 되면 안 된다. NONE으로는 절대 되돌리지 않는다 — NONE은 "약속이 아직 완료 안 됨"이고
+     * 이 경우는 이미 완료된 상태다.
+     */
+    private void revertPlanStatusIfEmpty(Long planId) {
+        if (planId == null) {
+            return; // FREE MEMORY — 되돌릴 약속이 없다
+        }
+        if (memoryMapper.countActiveByPlanId(planId) == 0) {
+            memoryMapper.updatePlanMemoryStatus(planId, "CANDIDATE");
+        }
+    }
+
+    /**
+     * 약속 연결 변경/해제(clov-api#98) — {@code newPlanIdStr}가 null이면 해제(FREE MEMORY로),
+     * 아니면 그 약속으로 연결/이동한다. EXP는 건드리지 않는다 — createFromPlan·createFree가 이미
+     * 같은 양을 주므로 연결/해제로 재화가 달라지면 안 된다.
+     */
+    private void updatePlanLink(Memory memory, long userId, String newPlanIdStr) {
+        Long oldPlanId = memory.getPlanId();
+        Long newPlanId = newPlanIdStr == null ? null : Long.parseLong(newPlanIdStr);
+
+        if (Objects.equals(oldPlanId, newPlanId)) {
+            return;
+        }
+
+        if (newPlanId != null) {
+            long newPlanRoomId = memoryMapper.findPlanRoomId(newPlanId)
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+            // 다른 방 약속은 존재 여부를 드러내지 않고 그냥 못 찾은 것처럼 처리한다.
+            if (newPlanRoomId != memory.getRoomId()) {
+                throw new DomainException(ErrorCode.NOT_FOUND);
+            }
+            String newPlanMemoryStatus = memoryMapper.findPlanMemoryStatus(newPlanId)
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+            if ("NONE".equals(newPlanMemoryStatus)) {
+                throw new DomainException(ErrorCode.PLAN_NOT_COMPLETED);
+            }
+            // 삭제분 포함 조회 — uk_memories_plan_writer가 deleted_at을 모르므로, 삭제된 행이라도
+            // 남아 있으면 이 UPDATE가 유니크 제약을 건드린다. 되살리기는 "삭제 후 재작성"(createFromPlan)
+            // 전용 동작이라 여기서는 다루지 않고 막기만 한다 — 대상이 다른 memory 행이라 되살리면
+            // 두 추억이 하나로 뒤섞인다.
+            memoryMapper.findByPlanIdAndWriterId(newPlanId, userId)
+                    .filter(other -> !other.getId().equals(memory.getId()))
+                    .ifPresent(other -> { throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN); });
+        }
+
+        memoryMapper.updateMemoryPlanId(memory.getId(), newPlanId);
+
+        if (oldPlanId != null) {
+            revertPlanStatusIfEmpty(oldPlanId);
+        }
+        if (newPlanId != null) {
+            memoryMapper.updatePlanMemoryStatusWritten(newPlanId);
+        }
     }
 
     @Transactional

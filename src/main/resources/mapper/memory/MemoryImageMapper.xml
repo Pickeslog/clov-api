@@ -57,6 +57,10 @@
         DELETE FROM memory_images WHERE id = #{imageId}
     </delete>
 
+    <delete id="deleteByMemoryId">
+        DELETE FROM memory_images WHERE memory_id = #{memoryId}
+    </delete>
+
     <update id="updateSortOrder">
         UPDATE memory_images SET sort_order = #{sortOrder} WHERE id = #{imageId}
     </update>
