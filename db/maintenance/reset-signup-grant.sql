@@ -84,6 +84,15 @@ SELECT COUNT(*) AS 백업된_지갑 FROM _bak_user_wallets_20260802;
 --   이미 쓴 사람은 아이템도 갖고 1,000 도 받지만, 목적이 "계약대로 된 시작 상태"이고
 --   삭제가 없어 되돌릴 수 있으므로 이쪽이 맞다.
 -- ============================================================
+-- ⚠️⚠️ START TRANSACTION 부터 COMMIT 까지는 "한 번에" 실행한다. 중간에서 멈춰 결과를
+--       눈으로 확인하고 나중에 COMMIT 하면 안 된다.
+--
+--       Workbench 는 유휴 연결을 끊고 조용히 재연결하는데, 그러면 열려 있던 트랜잭션이
+--       롤백된다. 그 뒤의 COMMIT 은 새 연결에서 도는 빈 명령이라 "0 rows affected" 로
+--       성공한 것처럼 보인다. 눈으로는 성공인데 데이터는 그대로다.
+--
+--       2026-08-02 에 실제로 밟았다 — 18분 뒤에 COMMIT 했고, §3 검증에서 20,000 이
+--       13건 그대로 남아 있어서 알았다. 확인은 §0-3 미리보기(트랜잭션 밖)에서 끝내라.
 START TRANSACTION;
 
 UPDATE user_wallets w
@@ -96,15 +105,10 @@ UPDATE wallet_transactions
 SET amount = @NEW_GRANT, balance_after = @NEW_GRANT
 WHERE reason = 'SIGNUP_GRANT' AND amount = @OLD_GRANT;
 
--- 커밋 전에 확인 — 전부 1,000 이어야 한다
-SELECT u.id, u.email, w.balance
-FROM tmp_old_grant_users t
-JOIN users u        ON u.id = t.user_id
-JOIN user_wallets w ON w.user_id = t.user_id
-ORDER BY u.id;
-
 COMMIT;
--- 문제가 보이면 COMMIT 대신: ROLLBACK;
+-- 위 두 UPDATE 가 각각 "13 rows affected" 같은 정상 건수인지만 Output 에서 확인하고
+-- 바로 COMMIT 한다. 여기서 SELECT 로 눈검사를 하며 시간을 끌면 연결이 끊겨 롤백된다.
+-- 잘못됐으면 §0-4 스냅샷으로 되돌린다(그래서 스냅샷을 먼저 만든다).
 
 
 -- ============================================================
