@@ -20,6 +20,15 @@
 SET @OLD_GRANT = 20000;
 SET @NEW_GRANT = 1000;
 
+-- MySQL Workbench 는 safe update mode 가 기본 ON 이라, WHERE 에 키 컬럼이 없는 UPDATE 를
+-- "Error Code: 1175" 로 막는다. 아래 wallet_transactions UPDATE 들이 reason·amount 로만
+-- 거르기 때문에 §1·§1-B 양쪽에서 걸린다(user_wallets 쪽은 PK 조인이라 통과한다).
+--
+-- ⚠️ 이걸 안 켜고 돌리면 지갑만 바뀌고 원장은 안 바뀐 채로 트랜잭션이 열려 있게 된다.
+--    (2026-08-02 실제로 밟았다. statement 실패는 트랜잭션을 롤백하지 않는다)
+-- 끝나면 §3 에서 다시 1 로 되돌린다.
+SET SQL_SAFE_UPDATES = 0;
+
 
 -- ============================================================
 -- §0. 진단 — 먼저 이것부터 본다
@@ -171,5 +180,7 @@ WHERE balance > (SELECT COALESCE(SUM(price), 0) FROM shop_items WHERE status = '
 -- 정정 후 분포
 SELECT COUNT(*) AS wallets, MIN(balance) AS min_bal, MAX(balance) AS max_bal, SUM(balance) AS total_bal
 FROM user_wallets;
+
+SET SQL_SAFE_UPDATES = 1; -- 머리에서 껐던 것을 되돌린다
 
 DROP TEMPORARY TABLE IF EXISTS tmp_old_grant_users;
