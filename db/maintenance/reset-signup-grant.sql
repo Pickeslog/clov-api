@@ -1,7 +1,11 @@
 -- ============================================================
 -- Clov — 시작 골드 20,000 지갑 정정 (clov-api#105)
 --
--- ⚠️ 실행 전에 반드시 §0 진단을 눈으로 확인할 것. §1·§2는 서로 배타적이다.
+-- ⚠️⚠️ 이 DB는 배포된 팀 공용 서비스가 그대로 쓰는 DB다. 분리된 dev DB가 없다.
+--       여기서 바꾸는 값은 팀원들에게 즉시 보인다. "dev니까 괜찮다"가 성립하지 않는다.
+--       (2026-08-02 확인 — 대상 13계정에 리더·chacha 실계정이 포함돼 있었다)
+-- ⚠️ 실행 전에 반드시 §0 진단을 눈으로 확인할 것. §1·§1-B·§2는 서로 배타적이다.
+-- ⚠️ 남의 잔액을 건드리는 작업이다. 실행 전에 팀에 알릴 것.
 -- ⚠️ §0~§3을 같은 커넥션(같은 세션)에서 실행할 것 — TEMPORARY TABLE을 쓴다.
 --
 -- 배경
@@ -46,6 +50,53 @@ JOIN users u        ON u.id = t.user_id
 JOIN user_wallets w ON w.user_id = t.user_id
 ORDER BY w.balance DESC;
 
+-- 0-4. 되돌리기용 스냅샷 — 실DB라서 어떤 옵션을 고르든 이걸 먼저 만든다.
+--      임시 테이블이 아니라 실제 테이블이다(세션이 끊겨도 남아야 한다).
+CREATE TABLE IF NOT EXISTS _bak_user_wallets_20260802 AS
+SELECT user_id, balance FROM user_wallets;
+
+SELECT COUNT(*) AS 백업된_지갑 FROM _bak_user_wallets_20260802;
+-- 되돌리려면:
+--   UPDATE user_wallets w JOIN _bak_user_wallets_20260802 b ON b.user_id = w.user_id
+--      SET w.balance = b.balance;
+-- 정리는 데모가 끝난 뒤에:  DROP TABLE _bak_user_wallets_20260802;
+
+
+-- ============================================================
+-- §1-B. [옵션 C · 권장] 잔액만 1,000으로 맞추고 보유 아이템은 남긴다
+--
+--   §1(A)은 "20,000 - 19,000" 뺄셈이라, 이미 1,000 넘게 쓴 계정이 0 으로 떨어진다.
+--   2026-08-02 실측에서 리더(18,320)와 chacha(7,800)가 정확히 거기 걸렸다.
+--   시연 계정이 0 골드면 상점이 고장난 것처럼 보여서 데모에는 A 를 쓸 수 없다.
+--
+--   B 는 반대로 지갑·원장·보유함을 지우는데, 실DB라서 팀원의 구매 이력이 사라진다.
+--
+--   그래서 이 옵션: 잔액을 뺄셈이 아니라 대입으로 1,000 에 맞추고 보유 아이템은 둔다.
+--   이미 쓴 사람은 아이템도 갖고 1,000 도 받지만, 목적이 "계약대로 된 시작 상태"이고
+--   삭제가 없어 되돌릴 수 있으므로 이쪽이 맞다.
+-- ============================================================
+START TRANSACTION;
+
+UPDATE user_wallets w
+JOIN tmp_old_grant_users t ON t.user_id = w.user_id
+SET w.balance = @NEW_GRANT;
+
+-- 원장의 지급 기록도 고친다. 안 고치면 다음에 이 스크립트를 다시 돌릴 때
+-- 같은 계정이 또 대상으로 잡힌다(§1 과 같은 이유).
+UPDATE wallet_transactions
+SET amount = @NEW_GRANT, balance_after = @NEW_GRANT
+WHERE reason = 'SIGNUP_GRANT' AND amount = @OLD_GRANT;
+
+-- 커밋 전에 확인 — 전부 1,000 이어야 한다
+SELECT u.id, u.email, w.balance
+FROM tmp_old_grant_users t
+JOIN users u        ON u.id = t.user_id
+JOIN user_wallets w ON w.user_id = t.user_id
+ORDER BY u.id;
+
+COMMIT;
+-- 문제가 보이면 COMMIT 대신: ROLLBACK;
+
 
 -- ============================================================
 -- §1. [옵션 A · 보수적] 시작 골드만 정정한다
@@ -55,6 +106,10 @@ ORDER BY w.balance DESC;
 --
 --   ⚠️ 이미 1,000 넘게 쓴 계정은 0 이 된다(음수 방지). §0-3 의 '비고' 열을 먼저 볼 것.
 --      그 계정은 "20,000 이 있었기에 가능했던 구매"를 이미 한 상태라 완전한 원복은 불가능하다.
+--
+--   ⚠️ 2026-08-02 에는 이 옵션을 쓰지 않았다. 대상 13계정 중 4계정이 0 으로 떨어졌고
+--      거기에 시연에 쓸 리더·chacha 계정이 포함돼 있었다. §1-B 를 썼다.
+--      "잔액이 20,000 그대로인 계정만" 남았을 때 쓰기 좋은 옵션이다.
 -- ============================================================
 START TRANSACTION;
 
