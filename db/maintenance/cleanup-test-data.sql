@@ -2,7 +2,11 @@
 -- Clov dev DB — 테스트 데이터 정리
 -- 작성: 2026-07-24 (초대 플로우 2계정 라이브 검증 후)
 --
--- ⚠️ 반드시 dev DB에서만. 운영 DB에서 실행 금지.
+-- ⚠️⚠️ 이 DB는 배포된 팀 공용 서비스가 그대로 쓰는 DB다. 분리된 dev DB가 없다.
+--       (2026-08-02 확인. 이전 문구 "반드시 dev DB에서만"은 분리된 DB가 있다는 오해를 준다)
+--       여기서 지우는 건 팀원들에게 즉시 보이고 되돌릴 수 없다. §1 미리보기를 반드시 눈으로 볼 것.
+-- ⚠️ 대상은 email LIKE '%@test.local' 뿐이다. qa-...@example.com 같은 계정은 §0에 보이기만 하고
+--    지워지지 않는다. 지우려면 §1 조건에 직접 추가해야 한다(의도적으로 자동 포함하지 않았다).
 -- ⚠️ 스키마에 ON DELETE CASCADE가 없어 자식 → 부모 순서로 지운다. 순서 바꾸지 말 것.
 -- ⚠️ §0~§3을 같은 커넥션(같은 세션)에서 실행할 것. TEMPORARY TABLE을 쓴다.
 --    (GUI 툴에서 탭을 새로 열면 세션이 바뀌어 임시 테이블이 사라진다)
@@ -160,7 +164,19 @@ DELETE FROM room_members
 DELETE FROM friendship_rooms
  WHERE id IN (SELECT id FROM tmp_test_rooms);
 
--- 2-7. 유저 부속 → 유저
+-- 2-7. 상점 (clov-api#105 보완)
+--      이 스크립트는 2026-07-24 작성이고 상점 테이블은 07-29에 생겼다. 세 테이블 모두
+--      users(id)를 FK로 잡으므로 여기가 없으면 아래 `DELETE FROM users`가 외래키 위반으로
+--      막히고 §2 트랜잭션이 통째로 롤백된다 — 상점을 한 번이라도 연 테스트 계정이 있으면
+--      반드시 걸린다(지갑은 상점 진입 시 getOrCreateWallet으로 자동 생성된다).
+--
+--      user_preferences.equipped_item_id 는 shop_items 를 참조하는데, shop_items 자체는
+--      카탈로그(마스터 데이터)라 지우지 않는다. user_preferences 행만 지우면 충분하다.
+DELETE FROM wallet_transactions   WHERE user_id IN (SELECT id FROM tmp_test_users);
+DELETE FROM user_inventory_items  WHERE user_id IN (SELECT id FROM tmp_test_users);
+DELETE FROM user_wallets          WHERE user_id IN (SELECT id FROM tmp_test_users);
+
+-- 2-8. 유저 부속 → 유저
 DELETE FROM refresh_tokens  WHERE user_id IN (SELECT id FROM tmp_test_users);
 DELETE FROM user_preferences WHERE user_id IN (SELECT id FROM tmp_test_users);
 DELETE FROM users            WHERE id      IN (SELECT id FROM tmp_test_users);
@@ -180,7 +196,11 @@ UNION ALL SELECT 'join_requests',    COUNT(*) FROM room_join_requests WHERE room
 UNION ALL SELECT 'notifications',    COUNT(*) FROM notifications     WHERE room_id IN (SELECT id FROM tmp_test_rooms)
 UNION ALL SELECT 'memories',         COUNT(*) FROM memories          WHERE room_id IN (SELECT id FROM tmp_test_rooms)
 UNION ALL SELECT 'plans',            COUNT(*) FROM plans             WHERE room_id IN (SELECT id FROM tmp_test_rooms)
-UNION ALL SELECT 'letters',          COUNT(*) FROM lucky_letters     WHERE room_id IN (SELECT id FROM tmp_test_rooms);
+UNION ALL SELECT 'letters',          COUNT(*) FROM lucky_letters     WHERE room_id IN (SELECT id FROM tmp_test_rooms)
+-- 상점(clov-api#105). 여기가 0이 아니면 §2-7이 안 돌았다는 뜻이고, 그러면 유저 삭제도 실패했다.
+UNION ALL SELECT 'wallets',          COUNT(*) FROM user_wallets       WHERE user_id IN (SELECT id FROM tmp_test_users)
+UNION ALL SELECT 'wallet_tx',        COUNT(*) FROM wallet_transactions WHERE user_id IN (SELECT id FROM tmp_test_users)
+UNION ALL SELECT 'inventory',        COUNT(*) FROM user_inventory_items WHERE user_id IN (SELECT id FROM tmp_test_users);
 
 DROP TEMPORARY TABLE IF EXISTS tmp_test_rooms;
 DROP TEMPORARY TABLE IF EXISTS tmp_test_users;
