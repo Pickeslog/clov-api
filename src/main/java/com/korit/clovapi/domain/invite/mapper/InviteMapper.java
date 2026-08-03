@@ -28,7 +28,4 @@ public interface InviteMapper {
     List<RoomInvite> findActiveByRoomId(@Param("roomId") long roomId);
 
     int cancelByIdAndCreatorId(@Param("inviteId") long inviteId, @Param("createdBy") long createdBy);
-
-    void insertJoinNotifications(@Param("roomId") long roomId, @Param("actorId") long actorId,
-                                 @Param("referenceId") long referenceId);
 }
