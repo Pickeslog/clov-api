@@ -162,6 +162,9 @@ public class InviteService {
         // accept 호출자(userId=수락자)를 actor로 쓰면 안 된다 — clov-api #90.
         notificationService.fanOut(request.getRoomId(), request.getUserId(),
                 NotificationService.TYPE_JOIN, NotificationService.SUB_MEMBER_JOINED, joinRequestId, null);
+        // 계약 §13 JOIN_ACCEPTED: 수신자=신청자 본인, actor=수락자(userId) — MEMBER_JOINED와 actor가 반대다(#113).
+        notificationService.notifyOne(request.getRoomId(), request.getUserId(), userId,
+                NotificationService.TYPE_JOIN, NotificationService.SUB_JOIN_ACCEPTED, joinRequestId, null);
         return new AcceptJoinRequestResponse(String.valueOf(member.getId()), String.valueOf(request.getRoomId()),
                 String.valueOf(request.getUserId()), undoDeadlineAt);
     }

@@ -100,11 +100,15 @@ class InviteIntegrationTest extends IntegrationTestSupport {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND user_id = ? AND status = 'ACTIVE'",
                 Integer.class, roomId, applicantId));
-        // MEMBER_JOINED(계약 §13): 수신자=기존 멤버 전원(합류자 제외) → host만 1건, actor=합류자(applicant)여야 한다(clov-api #90/#91).
-        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, roomId));
+        // 수락 시 알림 2건(계약 §13, clov-api #90/#91/#113):
+        // MEMBER_JOINED → host(기존 멤버, actor=합류자), JOIN_ACCEPTED → applicant 본인(actor=수락자).
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, roomId));
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND recipient_id = ? AND actor_id = ? AND type = 'JOIN' AND sub_type = 'MEMBER_JOINED'",
                 Integer.class, roomId, hostId, applicantId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND recipient_id = ? AND actor_id = ? AND type = 'JOIN' AND sub_type = 'JOIN_ACCEPTED'",
+                Integer.class, roomId, applicantId, hostId));
 
         mockMvc.perform(post("/api/v1/join-requests/{id}/undo", joinRequestId).header("Authorization", bearer(hostId)))
                 .andExpect(status().isOk())
