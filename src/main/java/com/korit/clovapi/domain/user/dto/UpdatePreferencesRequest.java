@@ -30,7 +30,7 @@ public record UpdatePreferencesRequest(
 
         // rob은 프로덕션·DB·프론트가 쓰는 값이다. 프로토타입 위젯(croby-mascot.js)의 'robot'과
         // 다르며, 계약에 robot으로 잘못 적혀 있던 것을 2026-07-31에 정정했다.
-        @Pattern(regexp = "crobi|rob|burgerOldman|takoGun|kimCheolsu", message = "mascotType 허용값이 아닙니다(계약 §5)")
+        @Pattern(regexp = "crobi|rob|burgerOldman|takoGun|kimCheolsu|onyx", message = "mascotType 허용값이 아닙니다(계약 §5)")
         String mascotType
 ) {
 }

@@ -194,7 +194,7 @@ class UserIntegrationTest extends IntegrationTestSupport {
 
         // 허용값 전체가 통과한다 — 계약 §5 표에 값을 더할 때 여기와 @Pattern을 함께 고친다.
         // 셋 중 하나라도 빠지면 프론트에서 고를 수 있는 마스코트가 저장에서 400으로 튕긴다.
-        for (String mascot : new String[]{"crobi", "rob", "burgerOldman", "takoGun", "kimCheolsu"}) {
+        for (String mascot : new String[]{"crobi", "rob", "burgerOldman", "takoGun", "kimCheolsu", "onyx"}) {
             mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"mascotType\":\"" + mascot + "\"}"))
