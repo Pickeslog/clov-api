@@ -12,6 +12,7 @@ import com.korit.clovapi.domain.user.mapper.UserPreferenceMapper;
 import com.korit.clovapi.global.dto.EquippedItemResponse;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
+import com.korit.clovapi.global.time.ClovTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,9 @@ public class ShopService {
      * 1,000은 가장 싼 코스튬(600G) 하나를 바로 사고 두 번째는 못 사는 금액이다.
      */
     static final long SIGNUP_GRANT_AMOUNT = 1000;
+
+    /** 골드 획득(EARN_*) 일일 총 상한(계약 §15-4) — 사유와 무관하게 유저 단위로 하루 누적을 센다. */
+    private static final long DAILY_EARN_CAP = 500;
 
     private final ShopMapper shopMapper;
     private final UserPreferenceMapper preferenceMapper;
@@ -118,6 +122,44 @@ public class ShopService {
     public void unequip(long userId) {
         ensurePreferencesExist(userId);
         preferenceMapper.updateEquippedItem(userId, null);
+    }
+
+    /**
+     * 골드 적립 공통 진입점(마스코트 교감·추억 등록 등 지급 사유가 늘어날 때 공용으로 쓴다).
+     * 사유별 횟수 제한(예: 마스코트 하루 3회)은 호출부가 직접 확인하고 부른다 — 여기선
+     * 사유와 무관한 하루 총 상한(§15-4, 500골드)만 막는다. 상한 도달 시 조용히 지급하지
+     * 않는다(예외를 던지지 않는다) — XP는 이미 별도로 지급됐고, 골드만 안 오르면 된다.
+     * 반환값은 실제로 지급된 골드(0 또는 amount) — 호출부가 응답 DTO·말풍선에 실지급액을
+     * 그대로 실어 보내야, 캡에 걸려 조용히 0이 지급된 순간에도 화면이 거짓말을 하지 않는다.
+     */
+    @Transactional
+    public long earnGold(long userId, String reason, long amount, Long referenceId) {
+        long earnedToday = shopMapper.sumEarnedToday(userId, ClovTime.startOfTodayUtc());
+        if (earnedToday >= DAILY_EARN_CAP) {
+            return 0;
+        }
+
+        getOrCreateWallet(userId);
+        UserWallet wallet = shopMapper.findWalletForUpdate(userId)
+                .orElseThrow(() -> new IllegalStateException("wallet must exist after getOrCreateWallet"));
+
+        long newBalance = wallet.getBalance() + amount;
+        shopMapper.updateBalance(userId, newBalance);
+
+        WalletTransaction transaction = new WalletTransaction();
+        transaction.setUserId(userId);
+        transaction.setReason(reason);
+        transaction.setAmount(amount);
+        transaction.setBalanceAfter(newBalance);
+        transaction.setReferenceId(referenceId);
+        shopMapper.insertTransaction(transaction);
+        return amount;
+    }
+
+    /** 특정 사유의 오늘(유저 단위) 지급 횟수 — 호출부가 자기 사유의 하루 횟수 캡을 판정할 때 쓴다. */
+    @Transactional(readOnly = true)
+    public int countEarnedToday(long userId, String reason) {
+        return shopMapper.countReasonToday(userId, reason, ClovTime.startOfTodayUtc());
     }
 
     /**

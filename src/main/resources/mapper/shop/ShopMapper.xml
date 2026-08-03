@@ -83,4 +83,14 @@
         INSERT INTO wallet_transactions (user_id, reason, amount, balance_after, reference_id)
         VALUES (#{userId}, #{reason}, #{amount}, #{balanceAfter}, #{referenceId})
     </insert>
+
+    <select id="sumEarnedToday" resultType="long">
+        SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions
+        WHERE user_id = #{userId} AND reason IN ('EARN_MASCOT', 'EARN_MEMORY') AND created_at >= #{since}
+    </select>
+
+    <select id="countReasonToday" resultType="int">
+        SELECT COUNT(*) FROM wallet_transactions
+        WHERE user_id = #{userId} AND reason = #{reason} AND created_at >= #{since}
+    </select>
 </mapper>

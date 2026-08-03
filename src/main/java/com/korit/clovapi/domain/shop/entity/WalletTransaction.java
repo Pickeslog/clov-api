@@ -4,6 +4,8 @@ public class WalletTransaction {
 
     public static final String REASON_SIGNUP_GRANT = "SIGNUP_GRANT";
     public static final String REASON_PURCHASE = "PURCHASE";
+    public static final String REASON_EARN_MASCOT = "EARN_MASCOT";
+    public static final String REASON_EARN_MEMORY = "EARN_MEMORY";
 
     private long userId;
     private String reason;

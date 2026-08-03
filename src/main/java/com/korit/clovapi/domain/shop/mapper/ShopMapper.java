@@ -6,6 +6,7 @@ import com.korit.clovapi.domain.shop.entity.WalletTransaction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,4 +36,11 @@ public interface ShopMapper {
     void insertInventory(@Param("userId") long userId, @Param("itemId") long itemId, @Param("paidPrice") long paidPrice);
 
     void insertTransaction(WalletTransaction transaction);
+
+    /** 골드 획득 일일 총 상한(§15-4) 판정용 — EARN_* 사유 합계만 센다(SIGNUP_GRANT/PURCHASE 제외). */
+    long sumEarnedToday(@Param("userId") long userId, @Param("since") LocalDateTime since);
+
+    /** 사유별 유저 단위 일일 횟수 캡(예: EARN_MASCOT 하루 3회) 판정용. */
+    int countReasonToday(@Param("userId") long userId, @Param("reason") String reason,
+                          @Param("since") LocalDateTime since);
 }

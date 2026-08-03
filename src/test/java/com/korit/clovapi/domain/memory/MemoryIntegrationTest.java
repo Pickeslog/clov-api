@@ -82,6 +82,10 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id IN (?, ?)", writerId, otherId);
+        // 약속 연결 추억 등록이 골드도 지급하면서(§15-4) writer가 user_wallets 행을 갖게 됐다 —
+        // 지우지 않으면 users DELETE가 FK(fk_wallet_transactions_user/fk_user_wallets_user)에 걸린다.
+        jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id IN (?, ?)", writerId, otherId);
+        jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id IN (?, ?)", writerId, otherId);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", writerId, otherId);
     }
 
