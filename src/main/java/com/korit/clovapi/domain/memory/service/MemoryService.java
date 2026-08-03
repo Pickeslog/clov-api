@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -44,8 +45,12 @@ import java.util.stream.Collectors;
 public class MemoryService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
-    // 쿼터 상한(memory당 장수) — 계약 미정, 리더 확정 시 이 값만 교체(#45).
-    private static final int MAX_IMAGES_PER_MEMORY = 10;
+    // 쿼터 상한(memory당 장수) — 8로 확정(리더 결정 2026-07-30,
+    // screen-spec-source/03-memory-feed-screen.md §입력 제약). 프로토타입은 30이지만 프로덕션은
+    // 추억마다 R2에 실제 파일이 올라가서 저장 쿼터 도달 속도가 4배 가까이 빨라진다.
+    // 프론트(clov-web Feed.jsx MEMORY_PHOTO_LIMIT)와 같은 값이어야 한다 — 여기가 낮으면
+    // 화면에서 고를 수 있는 사진이 업로드에서 507로 튕긴다(실제로 프론트 15 vs 여기 10이었다).
+    private static final int MAX_IMAGES_PER_MEMORY = 8;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;
@@ -76,8 +81,27 @@ public class MemoryService {
         if ("NONE".equals(memoryStatus)) {
             throw new DomainException(ErrorCode.PLAN_NOT_COMPLETED);
         }
-        if (memoryMapper.findByPlanIdAndWriterId(planId, userId).isPresent()) {
-            throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN);
+
+        // clov-api#98 — findByPlanIdAndWriterId는 이제 삭제분도 본다. 활성 행이 있으면 기존대로 막고,
+        // 삭제된 행만 있으면 되살린다(지웠다 다시 쓰기가 500 없이 동작해야 한다). 이 경우 EXP/알림은
+        // 다시 주지 않는다 — 같은 행이 이미 처음 작성 때 받았다(재작성마다 EXP를 또 주면 삭제·재작성을
+        // 반복해 EXP를 무한정 채굴할 수 있다).
+        Memory existing = memoryMapper.findByPlanIdAndWriterId(planId, userId).orElse(null);
+        if (existing != null) {
+            if (existing.getDeletedAt() == null) {
+                throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN);
+            }
+            memoryMapper.revive(existing.getId(), request.title(), request.content(), request.memoryDate(),
+                    LocalDateTime.now(ZoneOffset.UTC));
+            // 삭제 전 사진·친구 메시지는 새 기록에 이어받지 않는다 — 완전히 다른 내용으로 다시
+            // 쓴 추억에 옛 첨부물이 그대로 붙어 있으면 맥락이 안 맞는다.
+            memoryImageMapper.deleteByMemoryId(existing.getId());
+            commentMapper.deleteByMemoryId(existing.getId());
+            memoryMapper.deleteTags(existing.getId());
+            memoryMapper.deleteParticipants(existing.getId());
+            saveTagsAndParticipants(existing.getId(), request);
+            memoryMapper.updatePlanMemoryStatusWritten(planId);
+            return getDetail(existing.getId(), userId);
         }
 
         Memory memory = buildMemory(roomId, planId, userId, request);
@@ -196,7 +220,7 @@ public class MemoryService {
 
         List<String> imageIds = request.imageIds();
         for (int order = 0; order < imageIds.size(); order++) {
-            long imageId = Long.parseLong(imageIds.get(order));
+            long imageId = parseId(imageIds.get(order));
             MemoryImage image = memoryImageMapper.findById(imageId)
                     .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
             if (image.getMemoryId() != memoryId) {
@@ -225,7 +249,16 @@ public class MemoryService {
         roomService.assertActiveMember(memory.getRoomId(), userId);
         assertWriter(memory, userId);
 
-        memoryMapper.update(memoryId, request);
+        if (request.has("planId")) {
+            updatePlanLink(memory, userId, request.getPlanId());
+        }
+
+        // planId만 보내는 요청(약속 연결 변경/해제 전용)도 있어서(clov-api#98), title·content·
+        // memoryDate가 하나도 없으면 이 UPDATE를 건너뛴다 — <set>에 채울 게 없으면 MyBatis가
+        // "UPDATE memories SET WHERE id=?"를 만들어 SQL 문법 오류가 난다(실제로 재현됨).
+        if (request.has("title") || request.has("content") || request.has("memoryDate")) {
+            memoryMapper.update(memoryId, request);
+        }
         if (request.has("tags")) {
             memoryMapper.deleteTags(memoryId);
             List<String> tags = request.getTags();
@@ -237,7 +270,7 @@ public class MemoryService {
             memoryMapper.deleteParticipants(memoryId);
             List<String> participantUserIds = request.getParticipantUserIds();
             if (participantUserIds != null && !participantUserIds.isEmpty()) {
-                memoryMapper.insertParticipants(memoryId, participantUserIds.stream().map(Long::parseLong).toList());
+                memoryMapper.insertParticipants(memoryId, participantUserIds.stream().map(this::parseId).toList());
             }
         }
         return getDetail(memoryId, userId);
@@ -249,6 +282,76 @@ public class MemoryService {
         roomService.assertActiveMember(memory.getRoomId(), userId);
         assertWriter(memory, userId);
         memoryMapper.softDelete(memoryId, LocalDateTime.now(ZoneOffset.UTC));
+        revertPlanStatusIfEmpty(memory.getPlanId());
+    }
+
+    /**
+     * 약속 연결 추억이 전부 삭제/해제되면(clov-api#98) memory_status를 WRITTEN → CANDIDATE로
+     * 되돌린다. 다른 멤버가 그 약속에 남긴 추억이 하나라도 살아 있으면 손대지 않는다 — 우정공간은
+     * 한 약속에 여러 명이 각자 기록을 남기는 구조라(핵심 원칙), 한 사람이 지웠다고 약속 전체가
+     * "미기록"이 되면 안 된다. NONE으로는 절대 되돌리지 않는다 — NONE은 "약속이 아직 완료 안 됨"이고
+     * 이 경우는 이미 완료된 상태다.
+     */
+    private void revertPlanStatusIfEmpty(Long planId) {
+        if (planId == null) {
+            return; // FREE MEMORY — 되돌릴 약속이 없다
+        }
+        if (memoryMapper.countActiveByPlanId(planId) != 0) {
+            return;
+        }
+        // WRITTEN에서만 내려온다. SKIPPED는 "이 약속은 추억을 안 남긴다"는 사용자 결정이라
+        // 되돌리면 안 된다 — PlanService.skip()에 상태 가드가 없어서 이미 WRITTEN인 약속도
+        // SKIPPED가 될 수 있고(멤버 8명이 같은 화면을 보므로 stale UI로 실제 도달한다), 그때
+        // 추억을 지우면 스킵이 조용히 풀려 '추억 스킵' 배지가 '추억 후보'로 바뀌고 작성 버튼이
+        // 되살아난다(clov-web Schedule.jsx의 MEMORY_LABEL·작성 버튼 조건).
+        if (!"WRITTEN".equals(memoryMapper.findPlanMemoryStatus(planId).orElse(null))) {
+            return;
+        }
+        memoryMapper.updatePlanMemoryStatus(planId, "CANDIDATE");
+    }
+
+    /**
+     * 약속 연결 변경/해제(clov-api#98) — {@code newPlanIdStr}가 null이면 해제(FREE MEMORY로),
+     * 아니면 그 약속으로 연결/이동한다. EXP는 건드리지 않는다 — createFromPlan·createFree가 이미
+     * 같은 양을 주므로 연결/해제로 재화가 달라지면 안 된다.
+     */
+    private void updatePlanLink(Memory memory, long userId, String newPlanIdStr) {
+        Long oldPlanId = memory.getPlanId();
+        Long newPlanId = newPlanIdStr == null ? null : parseId(newPlanIdStr);
+
+        if (Objects.equals(oldPlanId, newPlanId)) {
+            return;
+        }
+
+        if (newPlanId != null) {
+            long newPlanRoomId = memoryMapper.findPlanRoomId(newPlanId)
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+            // 다른 방 약속은 존재 여부를 드러내지 않고 그냥 못 찾은 것처럼 처리한다.
+            if (newPlanRoomId != memory.getRoomId()) {
+                throw new DomainException(ErrorCode.NOT_FOUND);
+            }
+            String newPlanMemoryStatus = memoryMapper.findPlanMemoryStatus(newPlanId)
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+            if ("NONE".equals(newPlanMemoryStatus)) {
+                throw new DomainException(ErrorCode.PLAN_NOT_COMPLETED);
+            }
+            // 삭제분 포함 조회 — uk_memories_plan_writer가 deleted_at을 모르므로, 삭제된 행이라도
+            // 남아 있으면 이 UPDATE가 유니크 제약을 건드린다. 되살리기는 "삭제 후 재작성"(createFromPlan)
+            // 전용 동작이라 여기서는 다루지 않고 막기만 한다 — 대상이 다른 memory 행이라 되살리면
+            // 두 추억이 하나로 뒤섞인다.
+            memoryMapper.findByPlanIdAndWriterId(newPlanId, userId)
+                    .filter(other -> !other.getId().equals(memory.getId()))
+                    .ifPresent(other -> { throw new DomainException(ErrorCode.MEMORY_ALREADY_WRITTEN); });
+        }
+
+        memoryMapper.updateMemoryPlanId(memory.getId(), newPlanId);
+
+        if (oldPlanId != null) {
+            revertPlanStatusIfEmpty(oldPlanId);
+        }
+        if (newPlanId != null) {
+            memoryMapper.updatePlanMemoryStatusWritten(newPlanId);
+        }
     }
 
     @Transactional
@@ -331,7 +434,21 @@ public class MemoryService {
         }
         if (request.participantUserIds() != null && !request.participantUserIds().isEmpty()) {
             memoryMapper.insertParticipants(memoryId,
-                    request.participantUserIds().stream().map(Long::parseLong).toList());
+                    request.participantUserIds().stream().map(this::parseId).toList());
+        }
+    }
+
+    /**
+     * 계약상 JSON ID는 문자열이라(AGENTS.md) 요청 본문의 ID를 여기서 long으로 판다. 숫자가 아니면
+     * {@code NumberFormatException}이 그대로 올라가 {@code @ExceptionHandler(Exception.class)}에
+     * 걸려 500이 나므로, 400(VALIDATION_FAILED)으로 바꿔서 던진다.
+     * {@code LetterService.parseUserId}와 같은 방식이다.
+     */
+    private long parseId(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            throw new DomainException(ErrorCode.VALIDATION_FAILED);
         }
     }
 }

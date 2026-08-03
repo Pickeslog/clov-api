@@ -95,23 +95,25 @@ class ExpIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void imageCommitGrantsBonusPerImageUpToTen() throws Exception {
+    void imageCommitGrantsBonusPerImageUpToTheLimit() throws Exception {
         long memoryId = createFreeMemory("사진 보너스 확인"); // +25
 
-        // 이미지 쿼터가 추억당 10장이라 API로는 10장까지만 올릴 수 있다.
-        for (int index = 0; index < 10; index++) {
+        // 이미지 쿼터가 추억당 8장이라 API로는 8장까지만 올릴 수 있다(계약 확정 2026-07-30).
+        // ExpService.MEMORY_IMAGE_BONUS_MAX도 같은 8이어야 한다 — 보너스 상한이 사진 상한보다
+        // 크면 초과분이 영원히 도달할 수 없는 죽은 규칙이 된다.
+        for (int index = 0; index < 8; index++) {
             commitImage(memoryId, index);
         }
-        // 쿼터가 나중에 늘어나도 XP 보너스는 10에서 멈춰야 하므로 상한을 직접 확인한다.
+        // 쿼터가 나중에 늘어나도 XP 보너스는 상한에서 멈춰야 하므로 직접 한 번 더 호출해 확인한다.
         expService.grantMemoryImageBonus(roomId, userId, memoryId);
 
-        // 25 + 10 = 35 → 레벨 1, 진행도 35
-        assertLevel(1, 35, 65);
+        // 25 + 8 = 33 → 레벨 1, 진행도 33
+        assertLevel(1, 33, 67);
         Integer bonusSum = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(SUM(exp_delta), 0) FROM friendship_exp_logs "
                         + "WHERE room_id = ? AND action_type = 'MEMORY_IMAGE_BONUS' AND reference_id = ?",
                 Integer.class, roomId, memoryId);
-        assertEquals(10, bonusSum);
+        assertEquals(8, bonusSum);
     }
 
     @Test

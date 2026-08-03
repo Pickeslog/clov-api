@@ -23,5 +23,8 @@ public interface MemoryImageMapper {
 
     void deleteById(@Param("imageId") long imageId);
 
+    /** clov-api#98 — 소프트 삭제된 추억을 되살릴 때, 삭제 전 사진은 새 기록에 이어받지 않고 비운다. */
+    void deleteByMemoryId(@Param("memoryId") long memoryId);
+
     void updateSortOrder(@Param("imageId") long imageId, @Param("sortOrder") int sortOrder);
 }

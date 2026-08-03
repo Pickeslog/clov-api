@@ -22,12 +22,22 @@ public enum ErrorCode {
     JOIN_REQUEST_UNDO_EXPIRED("JOIN_REQUEST_UNDO_EXPIRED", HttpStatus.CONFLICT, "가입 신청 되돌리기 시간이 만료되었습니다."),
     PLAN_NOT_COMPLETED("PLAN_NOT_COMPLETED", HttpStatus.CONFLICT, "완료되지 않은 약속에는 추억을 작성할 수 없습니다."),
     MEMORY_ALREADY_WRITTEN("MEMORY_ALREADY_WRITTEN", HttpStatus.CONFLICT, "이미 해당 약속의 추억을 작성했습니다."),
+    // 유니크 제약 위반의 최종 방어선(clov-api#98). 도메인별로 먼저 명확한 체크(예: MEMORY_ALREADY_WRITTEN)를
+    // 두는 게 원칙이고, 이건 경합(동시 요청) 등으로 그 체크를 빠져나갔을 때 500 대신 나가는 안전망이다.
+    DUPLICATE_RESOURCE("DUPLICATE_RESOURCE", HttpStatus.CONFLICT, "이미 존재하는 데이터와 충돌합니다."),
     COMMENT_ALREADY_EXISTS("COMMENT_ALREADY_EXISTS", HttpStatus.CONFLICT, "이미 이 추억에 한 줄 메시지를 남겼습니다."),
     STAGE_LOCKED("STAGE_LOCKED", HttpStatus.LOCKED, "이전 단계가 완료되지 않았습니다."),
     STAGE_ALREADY_UPLOADED("STAGE_ALREADY_UPLOADED", HttpStatus.CONFLICT, "해당 단계의 사진이 이미 등록되었습니다."),
     STORAGE_QUOTA_EXCEEDED("STORAGE_QUOTA_EXCEEDED", HttpStatus.INSUFFICIENT_STORAGE, "저장 공간이 부족합니다."),
     MASCOT_INTERACTION_LIMIT_REACHED("MASCOT_INTERACTION_LIMIT_REACHED", HttpStatus.TOO_MANY_REQUESTS, "오늘의 마스코트 교감 횟수를 모두 사용했습니다."),
     RATE_LIMITED("RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS, "요청 횟수가 제한되었습니다."),
+
+    SHOP_ITEM_NOT_FOUND("SHOP_ITEM_NOT_FOUND", HttpStatus.NOT_FOUND, "존재하지 않는 상점 아이템입니다."),
+    INSUFFICIENT_BALANCE("INSUFFICIENT_BALANCE", HttpStatus.CONFLICT, "골드가 부족합니다."),
+    ITEM_ALREADY_OWNED("ITEM_ALREADY_OWNED", HttpStatus.CONFLICT, "이미 보유 중인 아이템입니다."),
+    ITEM_NOT_PURCHASABLE("ITEM_NOT_PURCHASABLE", HttpStatus.CONFLICT, "지금은 구매할 수 없는 아이템입니다."),
+    ITEM_NOT_OWNED("ITEM_NOT_OWNED", HttpStatus.FORBIDDEN, "보유하지 않은 아이템입니다."),
+    ITEM_NOT_EQUIPPABLE("ITEM_NOT_EQUIPPABLE", HttpStatus.CONFLICT, "장착할 수 없는 아이템입니다."),
 
     INVALID_CREDENTIALS("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "로그인 정보를 확인해주세요."),
     EMAIL_DUPLICATED("EMAIL_DUPLICATED", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),

@@ -37,8 +37,14 @@ public class ExpService {
     public static final int MEMORY_WRITE_BASE = 25;
     /** 사진 1장당 보너스. */
     public static final int MEMORY_IMAGE_BONUS_PER_IMAGE = 1;
-    /** 추억 사진 보너스 상한(추억 1건당). */
-    public static final int MEMORY_IMAGE_BONUS_MAX = 10;
+    /**
+     * 추억 사진 보너스 상한(추억 1건당).
+     *
+     * <p><b>사진 개수 상한({@code MemoryService.MAX_IMAGES_PER_MEMORY} = 8)과 같은 값이어야 한다.</b>
+     * 이 값이 더 크면 초과분은 영원히 도달할 수 없는 죽은 규칙이 된다 — 실제로 사진 상한이 8로
+     * 확정된 뒤에도 여기가 10이라 9·10번째 보너스가 닿지 않았다(2026-07-31 정합).
+     */
+    public static final int MEMORY_IMAGE_BONUS_MAX = 8;
 
     private final RoomMapper roomMapper;
     private final NotificationService notificationService;
