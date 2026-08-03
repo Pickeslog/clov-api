@@ -100,7 +100,11 @@ class InviteIntegrationTest extends IntegrationTestSupport {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM room_members WHERE room_id = ? AND user_id = ? AND status = 'ACTIVE'",
                 Integer.class, roomId, applicantId));
-        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, roomId));
+        // MEMBER_JOINED(계약 §13): 수신자=기존 멤버 전원(합류자 제외) → host만 1건, actor=합류자(applicant)여야 한다(clov-api #90/#91).
+        assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, roomId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND recipient_id = ? AND actor_id = ? AND type = 'JOIN' AND sub_type = 'MEMBER_JOINED'",
+                Integer.class, roomId, hostId, applicantId));
 
         mockMvc.perform(post("/api/v1/join-requests/{id}/undo", joinRequestId).header("Authorization", bearer(hostId)))
                 .andExpect(status().isOk())

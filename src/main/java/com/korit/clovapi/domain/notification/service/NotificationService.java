@@ -27,6 +27,7 @@ public class NotificationService {
     public static final String SUB_PLAN_COMPLETE = "PLAN_COMPLETE";
     public static final String SUB_LEVEL_UP = "LEVEL_UP";
     public static final String SUB_JOIN_REQUEST = "JOIN_REQUEST";
+    public static final String SUB_MEMBER_JOINED = "MEMBER_JOINED";
 
     private final NotificationMapper notificationMapper;
     private final RoomService roomService;
