@@ -22,7 +22,7 @@ public record UpdatePreferencesRequest(
         String wallpaperIcon,
         String dashboardBackground,
 
-        @Pattern(regexp = "postbox", message = "letterTheme 허용값이 아닙니다(계약 §5)")
+        @Pattern(regexp = "postbox|giftbox", message = "letterTheme 허용값이 아닙니다(계약 §5)")
         String letterTheme,
 
         @Pattern(regexp = "stack|clothesline|diary", message = "memoryCardTheme 허용값이 아닙니다(계약 §5)")

@@ -201,6 +201,15 @@ class UserIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.mascotType").value(mascot));
         }
+
+        // letterTheme 허용값 전체(postbox·giftbox)가 통과한다 — #109, 계약 §5에 giftbox 추가.
+        for (String theme : new String[]{"postbox", "giftbox"}) {
+            mockMvc.perform(patch("/api/v1/users/me/preferences").header(HttpHeaders.AUTHORIZATION, bearer())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"letterTheme\":\"" + theme + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.letterTheme").value(theme));
+        }
     }
 
     private String bearer() {
