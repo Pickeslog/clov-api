@@ -160,11 +160,13 @@ public class InviteService {
                 .orElseThrow(() -> new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND));
         // 계약 §13 MEMBER_JOINED: 수신자=기존 멤버 전원(합류자 제외), actor=합류자(request.getUserId()).
         // accept 호출자(userId=수락자)를 actor로 쓰면 안 된다 — clov-api #90.
+        // type=FRIEND(JOIN 아님) — JOIN 탭은 Notifications.jsx가 알림 테이블을 조회하지 않는
+        // 가입 신청 처리함이라 여기 두면 안 보인다(web-design-repository#51, clov-api #126).
         notificationService.fanOut(request.getRoomId(), request.getUserId(),
-                NotificationService.TYPE_JOIN, NotificationService.SUB_MEMBER_JOINED, joinRequestId, null);
+                NotificationService.TYPE_FRIEND, NotificationService.SUB_MEMBER_JOINED, joinRequestId, null);
         // 계약 §13 JOIN_ACCEPTED: 수신자=신청자 본인, actor=수락자(userId) — MEMBER_JOINED와 actor가 반대다(#113).
         notificationService.notifyOne(request.getRoomId(), request.getUserId(), userId,
-                NotificationService.TYPE_JOIN, NotificationService.SUB_JOIN_ACCEPTED, joinRequestId, null);
+                NotificationService.TYPE_FRIEND, NotificationService.SUB_JOIN_ACCEPTED, joinRequestId, null);
         return new AcceptJoinRequestResponse(String.valueOf(member.getId()), String.valueOf(request.getRoomId()),
                 String.valueOf(request.getUserId()), undoDeadlineAt);
     }
