@@ -308,6 +308,24 @@ class RoomIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void leavingRoomNotifiesRemainingMembersButNotTheLeaver() throws Exception {
+        // 계약 §13 MEMBER_LEFT(web-design-repository#50): 수신자=남은 멤버 전원(나간 사람 제외), actor=나간 사람.
+        long leaveRoomId = createRoom(accessToken, "Leave Notify Room");
+        AuthUser remainingMember = signUp("Remaining Member");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", leaveRoomId, remainingMember.userId());
+
+        mockMvc.perform(delete("/api/v1/rooms/{roomId}/members/me", leaveRoomId).header("Authorization", bearerToken()))
+                .andExpect(status().isOk());
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, leaveRoomId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND recipient_id = ? AND actor_id = ? "
+                        + "AND type = 'FRIEND' AND sub_type = 'MEMBER_LEFT' AND reference_id = ?",
+                Integer.class, leaveRoomId, remainingMember.userId(), userId, leaveRoomId));
+    }
+
+    @Test
     void membersResponseExposesZeroPaddedBirthMonthDayAndNullWhenMissing() throws Exception {
         long localRoomId = createRoom(accessToken, "Birthday Room");
 
