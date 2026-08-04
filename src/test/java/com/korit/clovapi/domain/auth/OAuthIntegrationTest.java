@@ -93,7 +93,7 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(post("/api/v1/auth/oauth/exchange")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"" + existingCode + "\"}"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("OAUTH_CODE_INVALID"));
     }
 

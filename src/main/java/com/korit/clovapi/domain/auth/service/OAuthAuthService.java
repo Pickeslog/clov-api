@@ -29,7 +29,7 @@ public class OAuthAuthService {
         return userMapper.findByOauth(profile.provider(), profile.subject())
                 .map(user -> OAuthExchangeResponse.authenticated(authService.authenticate(user)))
                 .orElseGet(() -> OAuthExchangeResponse.registration(
-                        codeStore.issue(profile),
+                        codeStore.issueForRegistration(profile),
                         OAuthProfileResponse.from(profile)
                 ));
     }
