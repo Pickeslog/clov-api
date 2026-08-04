@@ -13,6 +13,7 @@ import com.korit.clovapi.domain.room.dto.StatusMessageResponse;
 import com.korit.clovapi.domain.room.dto.UpdateRoomRequest;
 import com.korit.clovapi.domain.room.entity.Room;
 import com.korit.clovapi.domain.room.entity.RoomMember;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.mapper.RoomMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.dto.PresignRequest;
@@ -33,11 +34,14 @@ public class RoomService {
     private final RoomMapper roomMapper;
     private final RoomMemberMapper roomMemberMapper;
     private final StoragePresigner storagePresigner;
+    private final NotificationService notificationService;
 
-    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper, StoragePresigner storagePresigner) {
+    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper, StoragePresigner storagePresigner,
+                        NotificationService notificationService) {
         this.roomMapper = roomMapper;
         this.roomMemberMapper = roomMemberMapper;
         this.storagePresigner = storagePresigner;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -101,6 +105,10 @@ public class RoomService {
     public void leave(long roomId, long userId) {
         assertActiveMember(roomId, userId);
         roomMemberMapper.leave(roomId, userId, LocalDateTime.now(ZoneOffset.UTC));
+        // 계약 §13 MEMBER_LEFT(web-design-repository#50): 수신자=남은 멤버 전원(나간 사람 제외), actor=나간 사람.
+        // referenceId는 joinRequestId 같은 참조 대상이 없어 ROOM_UPDATE·LEVEL_UP과 같이 roomId를 쓴다.
+        // 마지막 멤버가 나가는 경우 팬아웃 대상이 0명이라 자연히 no-op(별도 분기 불필요).
+        notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND, NotificationService.SUB_MEMBER_LEFT, roomId, null);
         if (roomMemberMapper.countActiveByRoomId(roomId) == 0) {
             roomMapper.updateStatusInactive(roomId, LocalDateTime.now(ZoneOffset.UTC).plusDays(30));
         }
