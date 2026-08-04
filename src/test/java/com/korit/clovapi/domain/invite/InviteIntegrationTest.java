@@ -325,8 +325,7 @@ class InviteIntegrationTest extends IntegrationTestSupport {
     private long createUser(String prefix) {
         String suffix = UUID.randomUUID().toString();
         String email = prefix + "-" + suffix + "@example.test";
-        jdbcTemplate.update("INSERT INTO users (email, nickname, personal_invite_code) VALUES (?, ?, ?)",
-                email, prefix, "CLV-" + suffix.substring(0, 6).toUpperCase());
+        jdbcTemplate.update("INSERT INTO users (email, nickname) VALUES (?, ?)", email, prefix);
         long userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
         userIds.add(userId);
         return userId;

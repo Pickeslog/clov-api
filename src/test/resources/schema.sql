@@ -17,14 +17,12 @@ CREATE TABLE users (
   terms_agreed_at       DATETIME     NULL COMMENT '✚ 서비스 이용약관 동의 시각(이메일 가입 필수, 앱 레벨 강제)',
   privacy_agreed_at     DATETIME     NULL COMMENT '✚ 개인정보 처리방침 동의 시각(이메일 가입 필수, 앱 레벨 강제)',
   marketing_agreed_at   DATETIME     NULL COMMENT '✚ 마케팅 수신 동의 시각(선택, NULL=미동의)',
-  personal_invite_code  VARCHAR(20)  NOT NULL,
   is_anonymized         BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '탈퇴=익명화(기록 보존)',
   anonymized_at         DATETIME     NULL,
   created_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_users_email (email),
-  UNIQUE KEY uk_users_invite_code (personal_invite_code),
   UNIQUE KEY uk_users_oauth (oauth_provider, oauth_subject)  -- ✚ 소셜 계정 중복 방지
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

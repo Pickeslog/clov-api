@@ -63,7 +63,6 @@ class UserIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.id").value(String.valueOf(userId)))
                 .andExpect(jsonPath("$.data.email").value(email))
                 .andExpect(jsonPath("$.data.nickname").value("클로버"))
-                .andExpect(jsonPath("$.data.personalInviteCode").exists())
                 .andExpect(jsonPath("$.data.isSocial").value(false));
 
         mockMvc.perform(patch("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer())
