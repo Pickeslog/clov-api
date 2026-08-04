@@ -7,12 +7,14 @@
 --
 -- ★★ reason 이 'SIGNUP_GRANT' 가 아니라 'ADMIN_GRANT' 다. 이게 이 파일의 존재 이유다.
 --
---   grant-test-gold.sql 은 'SIGNUP_GRANT' 로 기록한다. 그런데 이번 지급액이 하필
---   20,000 이고, reset-signup-grant.sql 이 정확히 이 조합을 대상으로 삼는다.
+--   grant-test-gold.sql 은 'SIGNUP_GRANT' 로 기록한다. 그런데 reset-signup-grant.sql 이
+--   정확히 그 사유의 특정 금액을 대상으로 삼는다.
 --
 --       reset-signup-grant.sql:  WHERE reason = 'SIGNUP_GRANT' AND amount = 20000
 --
---   즉 SIGNUP_GRANT/20000 으로 주면 이 지급이 "옛 시작골드 20,000" 과 구분되지 않는다.
+--   즉 SIGNUP_GRANT 로 주면 이 지급이 "옛 시작골드" 와 사유가 같아진다. 지금 금액은
+--   60,000 이라 amount 로는 안 걸리지만, 금액은 요청마다 바뀐다(오늘도 20,000 → 60,000).
+--   사유가 같으면 언젠가 금액도 겹친다.
 --   누군가 그 정정 스크립트를 한 번만 다시 돌리면 §1-B 가 balance 를 뺄셈이 아니라
 --   대입으로 1,000 에 맞추므로, 데모 도중에 참관자 잔액이 통째로 1,000 이 된다.
 --   원장 행도 amount=1000 으로 덮어써져서 얼마를 줬는지도 사라진다.
@@ -37,12 +39,16 @@
 
 SET NAMES utf8mb4;
 
-SET @grant_amount = 20000;   -- 더하는 값이다. 잔액을 이 값으로 맞추는 게 아니다.
+SET @grant_amount = 60000;   -- 더하는 값이다. 잔액을 이 값으로 맞추는 게 아니다.
 
 -- ─────────────────────────────────────────────────────────────
 -- §0. 대상 확인 — 이걸 안 보고 §1 을 돌리지 말 것
 -- ─────────────────────────────────────────────────────────────
 -- 기본 대상: 오늘 가입한 사람 전부(= 데모하러 들어온 동기들).
+-- ⚠️ 60,000 은 판매 중 카탈로그 전체(52,000)보다 크다. 의도한 것이다 — 참관자가
+--   17종을 다 사보고 콘텐츠 전부에 피드백을 주게 하려는 금액이다.
+--   ★ 대신 "골드가 모자라 못 산다"를 아무도 안 겪는다. 가격·획득량 밸런스 피드백은
+--     이 지급을 받은 계정에서 나올 수 없다. 그건 지급 안 한 계정으로 따로 봐야 한다.
 -- 팀 계정은 보통 이전에 만들었으므로 안 걸린다. 팀원도 주려면 §0-B 를 쓴다.
 SELECT u.id, u.email, u.nickname, u.created_at,
        COALESCE(w.balance, 0) AS balance_before,
@@ -105,7 +111,8 @@ ORDER BY u.created_at;
 -- ★ admin_grants 가 2 이상인 사람이 있으면 §1 을 두 번 돌린 것이다.
 --   그만큼 잔액도 두 번 들어갔다. §3 으로 한 번치를 빼면 된다.
 
--- 지갑 분포 — 잔액이 카탈로그 총액(52,000)을 넘는 사람이 생기면 상점이 의미를 잃는다.
+-- 지갑 분포. ⚠️ 이번엔 max_bal 이 카탈로그 총액을 넘는 게 정상이다(위 §0 참고).
+-- 평소 지급에서는 이 값이 총액을 넘으면 상점이 의미를 잃는다는 신호다.
 SELECT COUNT(*) AS wallets, MIN(balance) AS min_bal, MAX(balance) AS max_bal,
        (SELECT SUM(ROUND(price * (100 - discount_rate) / 100))
           FROM shop_items WHERE status = 'ACTIVE') AS active_catalog_total
