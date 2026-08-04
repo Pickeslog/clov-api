@@ -85,6 +85,25 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items[?(@.id=='" + cheapItemId + "')].owned").value(false));
     }
 
+    // 내린 상품(RETIRED)은 카탈로그에 안 나온다. 이 조건이 빠져 있으면 목록에는 보이는데
+    // 구매만 ITEM_NOT_PURCHASABLE로 막혀 "보이는데 못 사는" 상태가 된다.
+    // 아래 purchaseFailsWhen... 테스트가 구매 차단은 이미 지키고 있어서, 목록 쪽은 여기서 못박는다.
+    @Test
+    void catalogHidesRetiredItemsButInventoryKeepsThem() throws Exception {
+        mockMvc.perform(get("/api/v1/shop/items")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + retiredItemId + "')]").isEmpty())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + skinItemId + "')]").isNotEmpty());
+
+        // 카테고리 필터를 걸어도 마찬가지다(RETIRED 항목이 SKIN이라 같은 필터에 걸린다).
+        mockMvc.perform(get("/api/v1/shop/items")
+                        .header("Authorization", "Bearer " + token)
+                        .param("category", "SKIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + retiredItemId + "')]").isEmpty());
+    }
+
     @Test
     void purchaseDeductsBalanceRecordsLedgerAndMovesItemIntoInventory() throws Exception {
         mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)

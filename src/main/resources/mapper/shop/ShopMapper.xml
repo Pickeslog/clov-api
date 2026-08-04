@@ -32,7 +32,13 @@
                (inv.id IS NOT NULL) AS owned
         FROM shop_items i
         LEFT JOIN user_inventory_items inv ON inv.item_id = i.id AND inv.user_id = #{userId}
-        WHERE (#{category} IS NULL OR i.category = #{category})
+        <!--
+          RETIRED는 목록에서 뺀다. 이 조건이 없으면 내린 상품이 그대로 보이고, 누르면
+          ITEM_NOT_PURCHASABLE로 떨어져 "보이는데 못 사는" 상태가 된다(계약 §15-1).
+          내린 상품을 이미 산 사람은 findInventory로 계속 보므로 소유·장착에는 영향이 없다.
+        -->
+        WHERE i.status = 'ACTIVE'
+          AND (#{category} IS NULL OR i.category = #{category})
           AND (#{rarity} IS NULL OR i.rarity = #{rarity})
         ORDER BY i.sort_order ASC, i.id ASC
     </select>
