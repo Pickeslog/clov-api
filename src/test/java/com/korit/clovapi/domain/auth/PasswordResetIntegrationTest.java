@@ -190,11 +190,10 @@ class PasswordResetIntegrationTest extends IntegrationTestSupport {
     /** 소셜 전용 계정 = password NULL. 가입 API로는 만들 수 없어 직접 넣는다. */
     private void createSocialOnlyUser() {
         jdbcTemplate.update(
-                "INSERT INTO users (email, password, nickname, oauth_provider, oauth_subject, personal_invite_code,"
+                "INSERT INTO users (email, password, nickname, oauth_provider, oauth_subject,"
                         + " terms_agreed_at, privacy_agreed_at)"
-                        + " VALUES (?, NULL, ?, 'kakao', ?, ?, NOW(), NOW())",
-                socialEmail, "Social Test", UUID.randomUUID().toString(),
-                "CLV-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase()
+                        + " VALUES (?, NULL, ?, 'kakao', ?, NOW(), NOW())",
+                socialEmail, "Social Test", UUID.randomUUID().toString()
         );
     }
 

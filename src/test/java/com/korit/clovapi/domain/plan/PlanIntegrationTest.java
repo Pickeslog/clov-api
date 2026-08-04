@@ -223,10 +223,9 @@ class PlanIntegrationTest extends IntegrationTestSupport {
         String suffix = UUID.randomUUID().toString();
         String email = "plan-it-" + suffix + "@example.test";
         jdbcTemplate.update(
-                "INSERT INTO users (email, nickname, personal_invite_code) VALUES (?, ?, ?)",
+                "INSERT INTO users (email, nickname) VALUES (?, ?)",
                 email,
-                nickname,
-                "CLV-" + suffix.substring(0, 8)
+                nickname
         );
         long createdUserId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
         userIds.add(createdUserId);

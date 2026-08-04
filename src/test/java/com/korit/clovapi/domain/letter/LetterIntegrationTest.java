@@ -153,10 +153,9 @@ class LetterIntegrationTest extends IntegrationTestSupport {
 
     private long insertUser(String label) {
         String email = "letter-it-" + label + "-" + UUID.randomUUID() + "@example.test";
-        String inviteCode = "CLV-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         jdbcTemplate.update(
-                "INSERT INTO users (email, nickname, personal_invite_code) VALUES (?, ?, ?)",
-                email, label, inviteCode
+                "INSERT INTO users (email, nickname) VALUES (?, ?)",
+                email, label
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }

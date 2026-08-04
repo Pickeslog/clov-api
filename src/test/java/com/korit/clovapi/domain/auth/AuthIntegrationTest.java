@@ -52,7 +52,6 @@ class AuthIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.accessToken").isString())
                 .andExpect(jsonPath("$.data.refreshToken").isString())
                 .andExpect(jsonPath("$.data.user.id").isString())
-                .andExpect(jsonPath("$.data.user.personalInviteCode").value(org.hamcrest.Matchers.startsWith("CLV-")))
                 .andExpect(jsonPath("$.data.user.password").doesNotExist())
                 .andReturn();
 

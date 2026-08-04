@@ -19,7 +19,6 @@ public interface UserMapper {
             @Param("oauthSubject") String oauthSubject
     );
 
-    boolean existsByPersonalInviteCode(@Param("personalInviteCode") String personalInviteCode);
 
     void insert(User user);
     int updateProfile(@Param("userId") long userId, @Param("request") UpdateProfileRequest request);
