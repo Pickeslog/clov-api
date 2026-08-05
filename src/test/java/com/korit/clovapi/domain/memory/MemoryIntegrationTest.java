@@ -188,6 +188,71 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isNotFound());
     }
 
+    // 자유 추억 골드는 두 관문을 다 통과해야 지급된다(계약 §15-4) — 본문 20자 이상 + 하루 10회 미만.
+    // 어느 쪽에 걸려도 글은 정상 저장되고 201이 나간다. earnedGold만 0이다.
+    @Test
+    void freeMemoryGoldRequiresTwentyCharsAndStopsAfterTenPerDay() throws Exception {
+        // ① 본문 19자 — 한 글자 모자라서 지급되지 않는다. 글은 정상 생성된다.
+        createFreeMemoryExpectingGold("A".repeat(19), 0);
+
+        // ② 본문 20자 — 경계값이 지급된다(>= 판정임을 못박는다).
+        createFreeMemoryExpectingGold("B".repeat(20), 200);
+
+        // ③ 짧은 글은 횟수를 소모하지 않는다 — 지급이 없으면 원장 행도 없고, 횟수는 원장을 센다.
+        for (int i = 0; i < 5; i++) {
+            createFreeMemoryExpectingGold("C".repeat(5), 0);
+        }
+
+        // ④ 20자 이상으로 9건 더 채워 하루 10회를 소진한다(②의 1건 + 9건).
+        for (int i = 0; i < 9; i++) {
+            createFreeMemoryExpectingGold("D".repeat(25), 200);
+        }
+
+        // ⑤ 11번째는 429가 아니라 201 + earnedGold 0이다 — 글쓰기를 막는 건 골드 캡이 할 일이 아니다.
+        createFreeMemoryExpectingGold("E".repeat(25), 0);
+
+        // ⑥ 원장에는 지급된 10건만 남는다. 하루 최대 2,000(200 × 10)이다.
+        Long total = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions WHERE user_id = ? AND reason = ?",
+                Long.class, writerId, "EARN_MEMORY_FREE");
+        org.junit.jupiter.api.Assertions.assertEquals(2000L, total);
+    }
+
+    // 조회 응답에는 earnedGold가 실리지 않는다(계약 §10) — 그때는 지급이 일어나지 않으므로,
+    // 0을 보내면 "캡에 걸려 0원"과 구분되지 않는다.
+    @Test
+    void earnedGoldAppearsOnCreateOnlyNotOnRead() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Gold\",\"content\":\"" + "F".repeat(30) + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.earnedGold").value(200))
+                .andReturn();
+        long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.earnedGold").doesNotExist());
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Gold (edited)\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.earnedGold").doesNotExist());
+    }
+
+    private void createFreeMemoryExpectingGold(String content, int expectedGold) throws Exception {
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Free\",\"content\":\"" + content + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.earnedGold").value(expectedGold));
+    }
+
     @Test
     void planBasedMemoryEnforcesCompletionAndUniqueness() throws Exception {
         KeyHolder keyHolder = new GeneratedKeyHolder();

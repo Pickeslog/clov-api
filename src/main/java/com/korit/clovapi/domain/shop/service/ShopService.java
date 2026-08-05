@@ -30,14 +30,26 @@ public class ShopService {
      * 지갑 최초 생성 시 지급하는 시작 골드 (계약 §15-1 (2), 리더 확정 2026-07-30).
      *
      * ⚠️ 카탈로그 총액에 가깝게 올리지 말 것. 이전 값 20,000은 설계값이 아니라 개발 DB의
-     * 테스트 원장 데이터에 코드를 맞춘 숫자였는데, 카탈로그 총액(42,260)의 절반이라
-     * 가입 즉시 절반을 살 수 있었다 — 그러면 §15-4의 획득 규칙(하루 500)이 무의미해진다.
-     * 1,000은 가장 싼 코스튬(600G) 하나를 바로 사고 두 번째는 못 사는 금액이다.
+     * 테스트 원장 데이터에 코드를 맞춘 숫자였는데, 카탈로그 총액의 절반이라 가입 즉시
+     * 절반을 살 수 있었다 — 그러면 §15-4의 획득 규칙이 무의미해진다.
+     * 1,000은 가장 싼 코스튬(900G) 하나를 바로 사고 두 번째는 못 사는 금액이다.
      */
     static final long SIGNUP_GRANT_AMOUNT = 1000;
 
-    /** 골드 획득(EARN_*) 일일 총 상한(계약 §15-4) — 사유와 무관하게 유저 단위로 하루 누적을 센다. */
-    private static final long DAILY_EARN_CAP = 500;
+    /**
+     * 골드 획득(EARN_*) 일일 총 상한(계약 §15-4, 리더 확정 2026-08-05) — 사유와 무관하게
+     * 유저 단위로 하루 누적을 센다.
+     *
+     * ⚠️ 경로별 자체 캡의 합(마스코트 2,000 + 자유 추억 2,000 = 4,000)보다 커야 한다.
+     * 4,000 이하로 내리면 약속 완주(EARN_MEMORY)가 예산에서 통째로 밀려나, 핵심 흐름
+     * "약속 완료 후 추억 작성"에 골드가 닿지 못한다. 값을 내리려면 계약 §15-4의
+     * "카탈로그를 먼저 본다"를 따를 것 — active_catalog_total 을 재고, 여러 날에 걸쳐
+     * 한자리에 머무를 때만 내린다.
+     *
+     * ★ EARN_MEMORY 에는 자체 횟수 캡이 없다(약속 개수에 제한이 없어 만들기 → 완료 →
+     * 작성을 반복하면 한 바퀴 300골드다). 이 상수가 그 경로의 유일한 방어선이다.
+     */
+    private static final long DAILY_EARN_CAP = 6000;
 
     private final ShopMapper shopMapper;
     private final UserPreferenceMapper preferenceMapper;
@@ -126,22 +138,26 @@ public class ShopService {
 
     /**
      * 골드 적립 공통 진입점(마스코트 교감·추억 등록 등 지급 사유가 늘어날 때 공용으로 쓴다).
-     * 사유별 횟수 제한(예: 마스코트 하루 3회)은 호출부가 직접 확인하고 부른다 — 여기선
-     * 사유와 무관한 하루 총 상한(§15-4, 500골드)만 막는다. 상한 도달 시 조용히 지급하지
-     * 않는다(예외를 던지지 않는다) — XP는 이미 별도로 지급됐고, 골드만 안 오르면 된다.
+     * 사유별 횟수·내용 제한(마스코트 하루 10회, 자유 추억 하루 10회 + 본문 20자)은 호출부가
+     * 직접 확인하고 부른다 — 여기선 사유와 무관한 하루 총 상한(§15-4, 6,000골드)만 막는다.
+     * 상한 도달 시 조용히 지급하지 않는다(예외를 던지지 않는다) — XP는 이미 별도로 지급됐고,
+     * 골드만 안 오르면 된다.
      * 반환값은 실제로 지급된 골드(0 또는 amount) — 호출부가 응답 DTO·말풍선에 실지급액을
      * 그대로 실어 보내야, 캡에 걸려 조용히 0이 지급된 순간에도 화면이 거짓말을 하지 않는다.
      */
     @Transactional
     public long earnGold(long userId, String reason, long amount, Long referenceId) {
+        // ★ 캡 판정은 반드시 행 잠금을 잡은 뒤에 읽는다. 순서를 뒤집으면(sumEarnedToday → if →
+        // findWalletForUpdate) 동시 요청 둘이 잠금 밖에서 같은 누적치를 읽고 둘 다 통과해,
+        // 상한을 amount 만큼 넘겨 지급된다. 같은 유저의 지급은 이 잠금으로 직렬화된다.
+        getOrCreateWallet(userId);
+        UserWallet wallet = shopMapper.findWalletForUpdate(userId)
+                .orElseThrow(() -> new IllegalStateException("wallet must exist after getOrCreateWallet"));
+
         long earnedToday = shopMapper.sumEarnedToday(userId, ClovTime.startOfTodayUtc());
         if (earnedToday >= DAILY_EARN_CAP) {
             return 0;
         }
-
-        getOrCreateWallet(userId);
-        UserWallet wallet = shopMapper.findWalletForUpdate(userId)
-                .orElseThrow(() -> new IllegalStateException("wallet must exist after getOrCreateWallet"));
 
         long newBalance = wallet.getBalance() + amount;
         shopMapper.updateBalance(userId, newBalance);

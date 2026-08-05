@@ -84,9 +84,14 @@
         VALUES (#{userId}, #{reason}, #{amount}, #{balanceAfter}, #{referenceId})
     </insert>
 
+    <!-- 계약 §15-4 — 합산 대상은 반드시 EARN_ 접두사 전체다. 사유를 이름으로 나열하면
+         새 획득 사유가 조용히 캡 밖으로 빠지고, 반대로 ADMIN_GRANT(운영 지급) 같은
+         비획득 사유를 얹으면 지급받은 날 정상 획득이 통째로 막힌다.
+         `\`는 LIKE 이스케이프 문자 지정용이다 — 안 쓰면 `_`가 임의의 한 글자로 매칭돼
+         `EARNX...` 같은 사유까지 걸린다. -->
     <select id="sumEarnedToday" resultType="long">
         SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions
-        WHERE user_id = #{userId} AND reason IN ('EARN_MASCOT', 'EARN_MEMORY') AND created_at >= #{since}
+        WHERE user_id = #{userId} AND reason LIKE 'EARN\_%' ESCAPE '\' AND created_at >= #{since}
     </select>
 
     <select id="countReasonToday" resultType="int">
