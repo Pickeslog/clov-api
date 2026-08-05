@@ -63,17 +63,23 @@ public class MemoryService {
     // writer_id)도 NULL 중복을 허용해서 막지 못하므로 유저 단위 하루 횟수 캡을 건다.
     private static final int MEMORY_FREE_DAILY_LIMIT = 10;
     /**
-     * 자유 추억 골드의 본문 최소 길이(계약 §15-4).
+     * 자유 추억 골드의 본문 최소 길이(계약 §15-4, 리더 확정 2026-08-05).
      *
-     * ★ 횟수 캡만으로는 채굴이 안 막힌다. CreateMemoryRequest 는 @NotBlank 가 title 에만 있고
-     * content 는 @Size(max=100) 뿐이라 <b>제목 한 글자짜리 글도 정상 저장된다</b> — 조건이
-     * 없으면 "ㅇ" 열 번에 2,000골드가 된다.
+     * ★ 이 값은 <b>빈 글만 거르는 장치다. 채굴 방지 장치가 아니다.</b> 채굴은 위의
+     * MEMORY_FREE_DAILY_LIMIT(하루 10회)가 막는다 — 길이 조건은 몇 자로 잡든 붙여넣기면
+     * 뚫리므로 방어력을 여기에 기대면 안 된다.
      *
-     * ⚠️ 글 저장 자체는 막지 않는다. 20자 미만이어도 추억은 정상 생성되고 201이 나가며
+     * ★ 20에서 3으로 내렸다. 사진 위주 추억은 본문이 짧은 것이 정상인데(계약 §12가
+     * MEMORY_IMAGE_BONUS 로 사진을 별도 노력으로 인정한다) 20자 게이트가 그런 글을
+     * 벌하고 있었다. 사진 유무로 판정하고 싶지만 <b>작성 시점에는 사진 수를 알 수 없다</b> —
+     * 프로덕션은 추억 생성 → presign → R2 PUT → 커밋 순서고 CreateMemoryRequest 에
+     * 이미지 필드가 없다(계약 §12).
+     *
+     * ⚠️ 글 저장 자체는 막지 않는다. 3자 미만이어도 추억은 정상 생성되고 201이 나가며
      * earnedGold 만 0이다 — 글쓰기를 막는 건 골드 캡이 할 일이 아니다(계약 §15-4).
      * 여기서 400을 던지지 말 것.
      */
-    private static final int MEMORY_FREE_MIN_CONTENT_LENGTH = 20;
+    private static final int MEMORY_FREE_MIN_CONTENT_LENGTH = 3;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;
