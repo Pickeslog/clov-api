@@ -188,22 +188,25 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isNotFound());
     }
 
-    // 자유 추억 골드는 두 관문을 다 통과해야 지급된다(계약 §15-4) — 본문 20자 이상 + 하루 10회 미만.
+    // 자유 추억 골드는 두 관문을 다 통과해야 지급된다(계약 §15-4) — 본문 3자 이상 + 하루 10회 미만.
     // 어느 쪽에 걸려도 글은 정상 저장되고 201이 나간다. earnedGold만 0이다.
+    //
+    // ★ 길이 조건은 "빈 글만 거르는" 장치라 경계가 낮다(3자). 채굴을 막는 것은 횟수 캡이다.
     @Test
-    void freeMemoryGoldRequiresTwentyCharsAndStopsAfterTenPerDay() throws Exception {
-        // ① 본문 19자 — 한 글자 모자라서 지급되지 않는다. 글은 정상 생성된다.
-        createFreeMemoryExpectingGold("A".repeat(19), 0);
+    void freeMemoryGoldRequiresThreeCharsAndStopsAfterTenPerDay() throws Exception {
+        // ① 본문 2자 — 한 글자 모자라서 지급되지 않는다. 글은 정상 생성된다.
+        createFreeMemoryExpectingGold("AA", 0);
 
-        // ② 본문 20자 — 경계값이 지급된다(>= 판정임을 못박는다).
-        createFreeMemoryExpectingGold("B".repeat(20), 200);
+        // ② 본문 3자 — 경계값이 지급된다(>= 판정임을 못박는다).
+        createFreeMemoryExpectingGold("BBB", 200);
 
         // ③ 짧은 글은 횟수를 소모하지 않는다 — 지급이 없으면 원장 행도 없고, 횟수는 원장을 센다.
+        //    공백만 있는 본문도 trim 후 0자라 여기 걸린다.
         for (int i = 0; i < 5; i++) {
-            createFreeMemoryExpectingGold("C".repeat(5), 0);
+            createFreeMemoryExpectingGold("  ", 0);
         }
 
-        // ④ 20자 이상으로 9건 더 채워 하루 10회를 소진한다(②의 1건 + 9건).
+        // ④ 3자 이상으로 9건 더 채워 하루 10회를 소진한다(②의 1건 + 9건).
         for (int i = 0; i < 9; i++) {
             createFreeMemoryExpectingGold("D".repeat(25), 200);
         }
