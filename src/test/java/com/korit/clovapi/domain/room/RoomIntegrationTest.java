@@ -301,9 +301,10 @@ class RoomIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/rooms/{roomId}/level", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.friendshipLevel").value(1))
-                .andExpect(jsonPath("$.data.expPoint").value(6))
+                // 교감 10회 × MASCOT_INTERACT 2 XP = 20 (캡을 3 → 10으로 올린 값을 따라간다)
+                .andExpect(jsonPath("$.data.expPoint").value(20))
                 .andExpect(jsonPath("$.data.expForNextLevel").value(100))
-                .andExpect(jsonPath("$.data.remainingToNextLevel").value(94));
+                .andExpect(jsonPath("$.data.remainingToNextLevel").value(80));
 
         mockMvc.perform(delete("/api/v1/rooms/{roomId}/members/me", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())

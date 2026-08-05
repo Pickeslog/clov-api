@@ -63,6 +63,11 @@ class NotificationFanOutIntegrationTest extends IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         for (Long id : userIds) {
             jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", id);
+            // 추억 등록이 골드도 지급하므로(계약 §15-4) 지갑 행이 남을 수 있다 — 지우지 않으면
+            // users DELETE 가 FK에 걸린다. 이 클래스는 본문이 20자 미만이라 지금은 지급이
+            // 일어나지 않지만, 본문을 늘리는 순간 조용히 깨지는 자리라 미리 정리한다.
+            jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", id);
+            jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", id);
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", id);
         }
     }
