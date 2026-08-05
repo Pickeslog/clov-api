@@ -244,6 +244,24 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.earnedGold").doesNotExist());
     }
 
+    // 하루 총 상한 합산은 EARN_ 접두사만 센다(계약 §15-4). ADMIN_GRANT(운영 지급)가 합산에
+    // 잡히면 지급받은 날 정상 획득이 통째로 막힌다.
+    //
+    // ★ 이 테스트는 LIKE 이스케이프가 깨지는 것도 같이 잡는다. ESCAPE 절이 빠지면 '_'가
+    // 임의의 한 글자로 매칭돼 다른 사유까지 합산에 걸리고, 이스케이프 문자로 백슬래시를
+    // 쓰면 MySQL이 문자열 리터럴에서 먼저 해석해 구문 오류가 난다.
+    @Test
+    void adminGrantIsExcludedFromTheDailyEarnCap() throws Exception {
+        // 상한(6,000)을 한참 넘는 운영 지급을 오늘 날짜로 원장에 직접 넣는다.
+        jdbcTemplate.update("INSERT INTO user_wallets (user_id, balance) VALUES (?, ?)"
+                + " ON DUPLICATE KEY UPDATE balance = VALUES(balance)", writerId, 100000);
+        jdbcTemplate.update("INSERT INTO wallet_transactions (user_id, reason, amount, balance_after)"
+                + " VALUES (?, 'ADMIN_GRANT', ?, ?)", writerId, 100000, 100000);
+
+        // 합산이 EARN_ 접두사로만 되면 오늘 획득량은 아직 0이라 정상 지급된다.
+        createFreeMemoryExpectingGold("G".repeat(25), 200);
+    }
+
     private void createFreeMemoryExpectingGold(String content, int expectedGold) throws Exception {
         mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
                         .header("Authorization", "Bearer " + writerToken)

@@ -376,7 +376,9 @@ CREATE TABLE user_inventory_items (
   CONSTRAINT fk_user_inventory_items_item FOREIGN KEY (item_id) REFERENCES shop_items(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE)
+-- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE/ADMIN_GRANT/
+--     EARN_MASCOT/EARN_MEMORY/EARN_MEMORY_FREE. 계약 §15-4 — 획득 사유만 EARN_ 접두사를
+--     쓰고, 하루 총 상한 합산이 그 접두사로 판정한다)
 CREATE TABLE wallet_transactions (
   id             BIGINT      NOT NULL AUTO_INCREMENT,
   user_id        BIGINT      NOT NULL,
