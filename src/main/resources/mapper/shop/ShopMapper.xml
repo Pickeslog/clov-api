@@ -89,4 +89,25 @@
         INSERT INTO wallet_transactions (user_id, reason, amount, balance_after, reference_id)
         VALUES (#{userId}, #{reason}, #{amount}, #{balanceAfter}, #{referenceId})
     </insert>
+
+    <!-- 계약 §15-4 — 합산 대상은 반드시 EARN_ 접두사 전체다. 사유를 이름으로 나열하면
+         새 획득 사유가 조용히 캡 밖으로 빠지고, 반대로 ADMIN_GRANT(운영 지급) 같은
+         비획득 사유를 얹으면 지급받은 날 정상 획득이 통째로 막힌다.
+
+         ★ 이스케이프 문자로 백슬래시를 쓰지 말 것. MySQL은 문자열 리터럴 안에서 백슬래시를
+         이스케이프 문자로 먼저 해석하므로 ESCAPE '\' 는 닫는 따옴표가 이스케이프돼
+         구문 오류가 된다(2026-08-05 CI에서 실제로 났다 — 이 쿼리가 깨지면서 earnGold 를
+         타는 모든 경로가 500이 됐다). '!' 는 그런 이중 해석이 없다.
+
+         ESCAPE 자체는 반드시 있어야 한다 — 없으면 '_' 가 임의의 한 글자로 매칭돼
+         EARNX_... 같은 사유까지 합산에 걸린다. -->
+    <select id="sumEarnedToday" resultType="long">
+        SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions
+        WHERE user_id = #{userId} AND reason LIKE 'EARN!_%' ESCAPE '!' AND created_at >= #{since}
+    </select>
+
+    <select id="countReasonToday" resultType="int">
+        SELECT COUNT(*) FROM wallet_transactions
+        WHERE user_id = #{userId} AND reason = #{reason} AND created_at >= #{since}
+    </select>
 </mapper>
