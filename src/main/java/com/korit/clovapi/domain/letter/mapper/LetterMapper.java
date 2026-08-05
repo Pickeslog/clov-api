@@ -18,6 +18,7 @@ public interface LetterMapper {
             @Param("roomId") long roomId,
             @Param("senderId") long senderId,
             @Param("receiverIds") List<Long> receiverIds,
+            @Param("title") String title,
             @Param("content") String content,
             @Param("emoji") String emoji,
             @Param("sentAt") LocalDateTime sentAt
