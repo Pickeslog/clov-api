@@ -129,6 +129,7 @@ CREATE TABLE plans (
   description                  TEXT         NULL COMMENT '메모(장소/시간은 자유서식으로)',
   status                       VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED' COMMENT 'SCHEDULED/COMPLETED/CANCELED',
   memory_status                VARCHAR(20)  NOT NULL DEFAULT 'NONE' COMMENT 'NONE/CANDIDATE/WRITTEN/SKIPPED',
+  plan_type                    VARCHAR(20)  NOT NULL DEFAULT 'NORMAL' COMMENT 'NORMAL/BIRTHDAY — 약속의 종류(계약 §8-1)',
   completed_at                 DATETIME     NULL,
   memory_candidate_created_at  DATETIME     NULL,
   created_at                   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

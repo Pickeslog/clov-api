@@ -240,6 +240,66 @@ class PlanIntegrationTest extends IntegrationTestSupport {
         );
     }
 
+    /**
+     * 계약 §8-1 planType — 생략하면 NORMAL, BIRTHDAY 는 그대로, 허용 목록 밖은 400.
+     * 목록·상세 응답에 항상 담기는지도 같이 본다(생략되면 프론트가 색을 정할 수 없다).
+     */
+    @Test
+    void planTypeDefaultsToNormalAndAcceptsBirthday() throws Exception {
+        // 생략 → NORMAL. createPlan 헬퍼는 planType 을 안 보낸다.
+        long normalId = createPlan(tokenFor(userId), "Normal plan", "2026-08-20");
+        mockMvc.perform(get("/api/v1/plans/{planId}", normalId)
+                        .header("Authorization", tokenFor(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.planType").value("NORMAL"));
+
+        // BIRTHDAY 는 그대로 저장된다.
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/plans", roomId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"철수님의 생일\",\"planDate\":\"2026-08-13\",\"planType\":\"BIRTHDAY\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.planType").value("BIRTHDAY"))
+                .andReturn();
+        long birthdayId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        // 목록에도 담긴다 — 카드마다 색을 정해야 하므로 여기 없으면 쓸모가 없다.
+        mockMvc.perform(get("/api/v1/rooms/{roomId}/plans", roomId)
+                        .header("Authorization", tokenFor(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.id == '" + birthdayId + "')].planType").value("BIRTHDAY"))
+                .andExpect(jsonPath("$.data.items[?(@.id == '" + normalId + "')].planType").value("NORMAL"));
+
+        // 허용 목록 밖 → 400.
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/plans", roomId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Garbage type\",\"planDate\":\"2026-08-21\",\"planType\":\"GARBAGE\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    /** 계약 §8-1 — 종류는 생성 시점에만 정해진다. PATCH 로 보내도 안 바뀐다. */
+    @Test
+    void planTypeIsNotChangeableByPatch() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/plans", roomId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"영희님의 생일\",\"planDate\":\"2026-09-01\",\"planType\":\"BIRTHDAY\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long planId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        // 제목은 바뀌고 planType 은 그대로여야 한다.
+        mockMvc.perform(patch("/api/v1/plans/{planId}", planId)
+                        .header("Authorization", tokenFor(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"영희 생파\",\"planType\":\"NORMAL\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("영희 생파"))
+                .andExpect(jsonPath("$.data.planType").value("BIRTHDAY"));
+    }
+
     private long createPlan(String token, String title, String planDate) throws Exception {
         MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/plans", roomId)
                         .header("Authorization", token)
