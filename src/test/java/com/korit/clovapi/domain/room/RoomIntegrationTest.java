@@ -128,6 +128,46 @@ class RoomIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void findMyRoomsMemberAvatarsIncludeOnlyActiveMembersOrderedByJoinedAt() throws Exception {
+        long avatarRoom = createRoom(accessToken, "Avatar Room");
+        AuthUser second = signUp("Second Member");
+        AuthUser leftUser = signUp("Left Member");
+        // 뒤에 참여한 멤버가 joinedAt 오름차순에서 두 번째로 와야 한다.
+        jdbcTemplate.update(
+                "INSERT INTO room_members (room_id, user_id, status, joined_at) VALUES (?, ?, 'ACTIVE', DATE_ADD(NOW(), INTERVAL 1 MINUTE))",
+                avatarRoom, second.userId());
+        // LEFT 멤버는 memberAvatars에 보이면 안 된다(계약 §4-3, clov-api#141).
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'LEFT')",
+                avatarRoom, leftUser.userId());
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].memberAvatars.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[0].userId").value(String.valueOf(userId)))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[0].nickname").value("Room Test"))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[1].userId").value(String.valueOf(second.userId())))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[1].nickname").value("Second Member"));
+    }
+
+    @Test
+    void findMyRoomsMemberAvatarsAreGroupedIndependentlyPerRoom() throws Exception {
+        // 배치(IN 절) 조회가 방마다 결과를 뒤섞지 않는지 확인한다(clov-api#141 — N+1을 없애면서
+        // 서버 안에서 새로 N+1을 만들지 않는 것과 별개로, 그룹핑 자체가 틀리면 다른 방의 아바타가 섞인다).
+        long roomWithExtraMember = createRoom(accessToken, "Extra Member Room");
+        long roomAlone = createRoom(accessToken, "Room Alone");
+        AuthUser second = signUp("Extra Member");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'ACTIVE')",
+                roomWithExtraMember, second.userId());
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.name=='Extra Member Room')].memberAvatars[*].userId",
+                        org.hamcrest.Matchers.hasItems(String.valueOf(userId), String.valueOf(second.userId()))))
+                .andExpect(jsonPath("$.data.items[?(@.name=='Room Alone')].memberAvatars[*].userId",
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(String.valueOf(second.userId())))));
+    }
+
+    @Test
     void coverImagePresignReturnsSignedPutUrlForMember() throws Exception {
         long createdRoomId = createRoom(accessToken, "Cover Room");
         mockMvc.perform(post("/api/v1/rooms/{roomId}/cover-image/presign", createdRoomId)

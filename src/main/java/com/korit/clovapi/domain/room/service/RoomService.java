@@ -26,7 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class RoomService {
@@ -81,9 +85,25 @@ public class RoomService {
     }
 
     public RoomSummariesResponse findMyRooms(long userId) {
-        return new RoomSummariesResponse(roomMapper.findSummariesByMemberUserId(userId).stream()
-                .map(RoomSummaryResponse::from)
+        List<Room> rooms = roomMapper.findSummariesByMemberUserId(userId);
+        Map<Long, List<RoomSummaryResponse.MemberAvatar>> avatarsByRoomId = findMemberAvatarsByRoomIds(
+                rooms.stream().map(Room::getId).toList());
+        return new RoomSummariesResponse(rooms.stream()
+                .map(room -> RoomSummaryResponse.from(room, avatarsByRoomId.getOrDefault(room.getId(), List.of())))
                 .toList());
+    }
+
+    // roomIds 전체를 한 번의 쿼리로 묶어서 조회한다(N+1 방지, 계약 §4-3·§6·clov-api#141).
+    // 방마다 findByRoomId를 따로 부르면 문제가 클라이언트에서 서버로 옮겨갈 뿐이다.
+    private Map<Long, List<RoomSummaryResponse.MemberAvatar>> findMemberAvatarsByRoomIds(List<Long> roomIds) {
+        if (roomIds.isEmpty()) {
+            return Map.of();
+        }
+        return roomMemberMapper.findActiveByRoomIds(roomIds).stream()
+                .collect(Collectors.groupingBy(
+                        RoomMember::getRoomId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(RoomSummaryResponse.MemberAvatar::from, Collectors.toList())));
     }
 
     @Transactional
