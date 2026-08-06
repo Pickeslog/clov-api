@@ -243,6 +243,7 @@ CREATE TABLE lucky_letters (
   room_id      BIGINT      NOT NULL,
   sender_id    BIGINT      NOT NULL,
   receiver_id  BIGINT      NOT NULL,
+  title        VARCHAR(60) NULL COMMENT '선택 입력 — 미입력 시 NULL',
   content      TEXT        NOT NULL,
   emoji        VARCHAR(20) NULL COMMENT '미입력 시 프론트 기본값 💌',
   read_at      DATETIME    NULL,

@@ -9,6 +9,7 @@
         <result property="roomId" column="room_id"/>
         <result property="senderId" column="sender_id"/>
         <result property="receiverId" column="receiver_id"/>
+        <result property="title" column="title"/>
         <result property="content" column="content"/>
         <result property="emoji" column="emoji"/>
         <result property="readAt" column="read_at"/>
@@ -23,6 +24,7 @@
         <result property="receiverId" column="receiver_id"/>
         <result property="receiverNickname" column="receiver_nickname"/>
         <result property="receiverProfileImageUrl" column="receiver_profile_image_url"/>
+        <result property="title" column="title"/>
         <result property="content" column="content"/>
         <result property="emoji" column="emoji"/>
         <result property="readAt" column="read_at"/>
@@ -32,20 +34,20 @@
 
     <insert id="insert" parameterType="com.korit.clovapi.domain.letter.entity.LuckyLetter"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, content, emoji, sent_at)
-        VALUES (#{roomId}, #{senderId}, #{receiverId}, #{content}, #{emoji}, #{sentAt})
+        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, title, content, emoji, sent_at)
+        VALUES (#{roomId}, #{senderId}, #{receiverId}, #{title}, #{content}, #{emoji}, #{sentAt})
     </insert>
 
     <insert id="insertBroadcast">
-        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, content, emoji, sent_at)
+        INSERT INTO lucky_letters (room_id, sender_id, receiver_id, title, content, emoji, sent_at)
         VALUES
         <foreach collection="receiverIds" item="receiverId" separator=",">
-            (#{roomId}, #{senderId}, #{receiverId}, #{content}, #{emoji}, #{sentAt})
+            (#{roomId}, #{senderId}, #{receiverId}, #{title}, #{content}, #{emoji}, #{sentAt})
         </foreach>
     </insert>
 
     <select id="findById" resultMap="letterResultMap">
-        SELECT id, room_id, sender_id, receiver_id, content, emoji, read_at, sent_at
+        SELECT id, room_id, sender_id, receiver_id, title, content, emoji, read_at, sent_at
         FROM lucky_letters
         WHERE id = #{id}
     </select>
@@ -53,7 +55,7 @@
     <select id="findBox" resultMap="letterDetailRowMap">
         SELECT l.id, l.sender_id, sender.nickname AS sender_nickname, sender.profile_image_url AS sender_profile_image_url,
                l.receiver_id, receiver.nickname AS receiver_nickname, receiver.profile_image_url AS receiver_profile_image_url,
-               l.content, l.emoji, l.read_at, l.sent_at,
+               l.title, l.content, l.emoji, l.read_at, l.sent_at,
                EXISTS(
                    SELECT 1 FROM letter_favorites f
                    WHERE f.letter_id = l.id AND f.user_id = #{viewerId}
@@ -74,7 +76,7 @@
     <select id="findDetailById" resultMap="letterDetailRowMap">
         SELECT l.id, l.sender_id, sender.nickname AS sender_nickname, sender.profile_image_url AS sender_profile_image_url,
                l.receiver_id, receiver.nickname AS receiver_nickname, receiver.profile_image_url AS receiver_profile_image_url,
-               l.content, l.emoji, l.read_at, l.sent_at,
+               l.title, l.content, l.emoji, l.read_at, l.sent_at,
                EXISTS(
                    SELECT 1 FROM letter_favorites f
                    WHERE f.letter_id = l.id AND f.user_id = #{viewerId}

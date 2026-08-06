@@ -44,6 +44,8 @@ public class LetterService {
         }
 
         String emoji = (request.emoji() == null || request.emoji().isBlank()) ? DEFAULT_EMOJI : request.emoji();
+        // 제목은 선택 입력 — 빈 문자열은 null로 정규화해 "미입력"과 구분 없이 취급한다.
+        String title = (request.title() == null || request.title().isBlank()) ? null : request.title();
         LocalDateTime sentAt = LocalDateTime.now(ZoneOffset.UTC);
 
         if (isBroadcast) {
@@ -53,7 +55,7 @@ public class LetterService {
                     .filter(memberId -> memberId != senderId)
                     .toList();
             if (!receiverIds.isEmpty()) {
-                letterMapper.insertBroadcast(roomId, senderId, receiverIds, request.content(), emoji, sentAt);
+                letterMapper.insertBroadcast(roomId, senderId, receiverIds, title, request.content(), emoji, sentAt);
             }
             return new LetterBroadcastResponse(receiverIds.size());
         }
@@ -65,6 +67,7 @@ public class LetterService {
         letter.setRoomId(roomId);
         letter.setSenderId(senderId);
         letter.setReceiverId(receiverId);
+        letter.setTitle(title);
         letter.setContent(request.content());
         letter.setEmoji(emoji);
         letter.setSentAt(sentAt);

@@ -8,6 +8,7 @@ public class LuckyLetter {
     private Long roomId;
     private Long senderId;
     private Long receiverId;
+    private String title;
     private String content;
     private String emoji;
     private LocalDateTime readAt;
@@ -21,6 +22,8 @@ public class LuckyLetter {
     public void setSenderId(Long senderId) { this.senderId = senderId; }
     public Long getReceiverId() { return receiverId; }
     public void setReceiverId(Long receiverId) { this.receiverId = receiverId; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public String getEmoji() { return emoji; }

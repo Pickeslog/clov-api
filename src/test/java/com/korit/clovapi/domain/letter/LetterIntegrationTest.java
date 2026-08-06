@@ -111,6 +111,37 @@ class LetterIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void sendsAndReadsALetterWithATitle() throws Exception {
+        MvcResult sendResult = mockMvc.perform(post("/api/v1/rooms/" + roomId + "/letters")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(senderId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"receiverUserId\":\"" + receiverId + "\",\"title\":\"생일 축하해\",\"content\":\"항상 응원할게\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.title").value("생일 축하해"))
+                .andReturn();
+
+        String letterId = JsonPath.read(sendResult.getResponse().getContentAsString(), "$.data.id");
+
+        mockMvc.perform(get("/api/v1/rooms/" + roomId + "/letters?box=sent")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(senderId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].id").value(letterId))
+                .andExpect(jsonPath("$.data.items[0].title").value("생일 축하해"));
+    }
+
+    @Test
+    void omitsTitleFieldWhenNotProvided() throws Exception {
+        // 제목 없이 보내면 응답에서 title 필드 자체가 생략된다(NON_NULL) — "" 취급이 아니라
+        // 아예 없다는 걸 명시적으로 검증한다.
+        mockMvc.perform(post("/api/v1/rooms/" + roomId + "/letters")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(senderId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"receiverUserId\":\"" + receiverId + "\",\"content\":\"제목 없이\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.title").doesNotExist());
+    }
+
+    @Test
     void requiresExactlyOneOfReceiverOrBroadcast() throws Exception {
         mockMvc.perform(post("/api/v1/rooms/" + roomId + "/letters")
                         .header(HttpHeaders.AUTHORIZATION, bearer(senderId))
