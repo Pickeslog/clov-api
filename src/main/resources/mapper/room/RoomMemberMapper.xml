@@ -40,6 +40,20 @@
         ORDER BY m.joined_at ASC, m.id ASC
     </select>
 
+    <!-- 계약 §4-3·§6 memberAvatars(clov-api#141) — status=ACTIVE만, joinedAt 오름차순, roomIds 전체를
+         한 번의 쿼리로 묶는다(N+1 방지). Java 쪽에서 room_id로 그룹핑한다. -->
+    <select id="findActiveByRoomIds" resultMap="roomMemberResultMap">
+        SELECT m.room_id, m.user_id, u.nickname, u.profile_image_url, m.status, m.joined_at
+        FROM room_members m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.room_id IN
+        <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+            #{roomId}
+        </foreach>
+        AND m.status = 'ACTIVE'
+        ORDER BY m.room_id ASC, m.joined_at ASC
+    </select>
+
     <update id="leave">
         UPDATE room_members
         SET status = 'LEFT', left_at = #{leftAt}
