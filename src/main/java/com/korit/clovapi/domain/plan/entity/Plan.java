@@ -14,6 +14,8 @@ public class Plan {
     private String description;
     private String status;
     private String memoryStatus;
+    /** NORMAL/BIRTHDAY — 약속의 종류(계약 §8-1). 생성 시점에만 정해지고 PATCH 로는 안 바뀐다. */
+    private String planType;
     private LocalDate planDate;
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
@@ -36,6 +38,8 @@ public class Plan {
     public void setStatus(String status) { this.status = status; }
     public String getMemoryStatus() { return memoryStatus; }
     public void setMemoryStatus(String memoryStatus) { this.memoryStatus = memoryStatus; }
+    public String getPlanType() { return planType; }
+    public void setPlanType(String planType) { this.planType = planType; }
     public LocalDate getPlanDate() { return planDate; }
     public void setPlanDate(LocalDate planDate) { this.planDate = planDate; }
     public LocalDateTime getCompletedAt() { return completedAt; }
