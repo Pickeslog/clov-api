@@ -23,20 +23,22 @@ spring:
           google:
             client-id: ${OAUTH_GOOGLE_CLIENT_ID:}
             client-secret: ${OAUTH_GOOGLE_CLIENT_SECRET:}
-            # 배포: APP_OAUTH_REDIRECT_BASE=https://clovlabcalss.store (provider가 돌려보낼 공개 콜백)
-            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/google
+            # {baseUrl}은 Spring Security 내장 플레이스홀더 — 요청이 들어온 실제 scheme+host로 매 요청 계산된다.
+            # 아래 server.forward-headers-strategy: framework가 nginx의 X-Forwarded-*를 신뢰하게 해줘서,
+            # clovlabcalss.store·clovlov.xyz 등 여러 도메인을 env var 없이 동시에 지원한다(#147).
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
             scope: openid, profile, email
           naver:
             client-id: ${OAUTH_NAVER_CLIENT_ID:}
             client-secret: ${OAUTH_NAVER_CLIENT_SECRET:}
-            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/naver
+            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
             authorization-grant-type: authorization_code
             client-name: Naver
             scope: name, email
           kakao:
             client-id: ${OAUTH_KAKAO_CLIENT_ID:}
             client-secret: ${OAUTH_KAKAO_CLIENT_SECRET:}
-            redirect-uri: ${APP_OAUTH_REDIRECT_BASE:http://localhost:8080}/login/oauth2/code/kakao
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
             authorization-grant-type: authorization_code
             client-authentication-method: client_secret_post
             client-name: Kakao
@@ -67,9 +69,6 @@ app:
     #    application-secret.yaml에 spring.mail.host/username/password를 추가한다(코드 수정 불필요).
     mode: ${APP_MAIL_MODE:log}
     from: ${APP_MAIL_FROM:no-reply@clovlabcalss.store}
-  oauth2:
-    # 배포: APP_OAUTH2_REDIRECT_URL=https://clovlabcalss.store/oauth2/redirect (소셜 로그인 후 프론트 복귀)
-    redirect-url: ${APP_OAUTH2_REDIRECT_URL:http://localhost:5173/oauth2/redirect}
   storage:
     # 실제 값은 application-secret.yaml(로컬 전용)에서 주입한다. R2는 region=auto.
     endpoint: ${APP_STORAGE_ENDPOINT:}
