@@ -123,6 +123,6 @@ sudo certbot --nginx -d clovlabcalss.store -d www.clovlabcalss.store
 
 ## ⚠️ 체크포인트
 - **application-secret.yaml·clov-api.env 는 커밋 금지**(시크릿). VM에만.
-- **CORS/redirect env**: 이 런북은 도메인 `clovlabcalss.store` 기준. 도메인 바뀌면 `clov-api.env` 3개 값 + 프론트 `VITE_API_BASE_URL` + OAuth 콘솔 전부 교체.
+- **다중 도메인 지원(#147)**: OAuth 콜백·프론트 복귀 주소는 요청 도메인 기준으로 자동 계산돼 env var가 필요 없다. 도메인을 추가할 때 손댈 곳은 셋뿐이다 — nginx `server_name`에 도메인 추가, `clov-api.env`의 `APP_CORS_ALLOWED_ORIGINS`에 콤마로 추가, 각 도메인의 콜백 URI를 카카오·네이버·구글 콘솔에 등록. 프론트 `VITE_API_BASE_URL`은 백엔드 자체를 바꾸는 게 아니면 그대로 둔다.
 - **방화벽**: GCP 방화벽에서 80·443 인그레스 허용 확인(8080은 외부 개방 불필요 — nginx만 접근).
 - **JWT secret**: dev와 다른 강한 값 권장(`openssl rand -base64 48`).

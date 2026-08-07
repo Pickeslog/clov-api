@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -103,5 +104,25 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(get("/oauth2/authorization/" + provider))
                     .andExpect(status().is3xxRedirection());
         }
+    }
+
+    // {baseUrl} 플레이스홀더(application.yaml)가 요청 도메인마다 다른 redirect_uri를
+    // provider에 보내는지 확인한다 — clovlabcalss.store·clovlov.xyz 병행 지원의 핵심(#147).
+    @Test
+    void sendsARedirectUriMatchingTheDomainTheRequestArrivedOn() throws Exception {
+        String onClovlov = authorizationRedirectUriFor("clovlov.xyz");
+        assertTrue(onClovlov.contains("redirect_uri=https%3A%2F%2Fclovlov.xyz%2Flogin%2Foauth2%2Fcode%2Fkakao"));
+
+        String onClovlabcalss = authorizationRedirectUriFor("clovlabcalss.store");
+        assertTrue(onClovlabcalss.contains("redirect_uri=https%3A%2F%2Fclovlabcalss.store%2Flogin%2Foauth2%2Fcode%2Fkakao"));
+    }
+
+    private String authorizationRedirectUriFor(String domain) throws Exception {
+        MvcResult result = mockMvc.perform(get("/oauth2/authorization/kakao")
+                        .header("X-Forwarded-Proto", "https")
+                        .header("X-Forwarded-Host", domain))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+        return result.getResponse().getHeader("Location");
     }
 }
