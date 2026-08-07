@@ -111,10 +111,10 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
     @Test
     void sendsARedirectUriMatchingTheDomainTheRequestArrivedOn() throws Exception {
         String onClovlov = authorizationRedirectUriFor("clovlov.xyz");
-        assertTrue(onClovlov.contains("redirect_uri=https%3A%2F%2Fclovlov.xyz%2Flogin%2Foauth2%2Fcode%2Fkakao"));
+        assertTrue(onClovlov.contains("redirect_uri=https://clovlov.xyz/login/oauth2/code/kakao"));
 
         String onClovlabcalss = authorizationRedirectUriFor("clovlabcalss.store");
-        assertTrue(onClovlabcalss.contains("redirect_uri=https%3A%2F%2Fclovlabcalss.store%2Flogin%2Foauth2%2Fcode%2Fkakao"));
+        assertTrue(onClovlabcalss.contains("redirect_uri=https://clovlabcalss.store/login/oauth2/code/kakao"));
     }
 
     private String authorizationRedirectUriFor(String domain) throws Exception {
