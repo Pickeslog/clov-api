@@ -211,6 +211,35 @@ class UserIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    // #145 — 가입엔 @Past가 있는데 수정엔 없어서 미래 생년월일이 저장되던 버그.
+    @Test
+    void updateProfileRejectsFutureBirthdate() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"birthdate\":\"2999-01-01\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void updateProfileAcceptsPastBirthdate() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"birthdate\":\"1995-05-20\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.birthdate").value("1995-05-20"));
+    }
+
+    // @Past는 null을 통과시킨다 — birthdate를 안 보내는 부분 수정(닉네임만)이 여전히 되는지 확인.
+    @Test
+    void updateProfileWithoutBirthdateStillSucceeds() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"닉네임만\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value("닉네임만"));
+    }
+
     private String bearer() {
         return "Bearer " + accessToken;
     }

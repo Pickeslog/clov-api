@@ -1,5 +1,7 @@
 package com.korit.clovapi.domain.shop.entity;
 
+import java.time.LocalDateTime;
+
 public class WalletTransaction {
 
     public static final String REASON_SIGNUP_GRANT = "SIGNUP_GRANT";
@@ -19,11 +21,29 @@ public class WalletTransaction {
      */
     public static final String REASON_EARN_MEMORY_FREE = "EARN_MEMORY_FREE";
 
+    private Long id;
     private long userId;
     private String reason;
     private long amount;
     private long balanceAfter;
     private Long referenceId;
+    private LocalDateTime createdAt;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 
     public long getUserId() {
         return userId;

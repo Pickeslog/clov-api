@@ -3,7 +3,9 @@ package com.korit.clovapi.domain.shop.service;
 import com.korit.clovapi.domain.shop.dto.PurchaseResponse;
 import com.korit.clovapi.domain.shop.dto.ShopItemResponse;
 import com.korit.clovapi.domain.shop.dto.ShopItemsResponse;
+import com.korit.clovapi.domain.shop.dto.ShopTransactionsResponse;
 import com.korit.clovapi.domain.shop.dto.WalletResponse;
+import com.korit.clovapi.domain.shop.dto.WalletTransactionResponse;
 import com.korit.clovapi.domain.shop.entity.ShopItem;
 import com.korit.clovapi.domain.shop.entity.UserWallet;
 import com.korit.clovapi.domain.shop.entity.WalletTransaction;
@@ -15,6 +17,8 @@ import com.korit.clovapi.global.exception.ErrorCode;
 import com.korit.clovapi.global.time.ClovTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * 상점(shop) 도메인 — DOMAIN-NAMING-REGISTRY/API-CONTRACT SSOT에 아직 등록되지 않은
@@ -50,6 +54,9 @@ public class ShopService {
      * 작성을 반복하면 한 바퀴 300골드다). 이 상수가 그 경로의 유일한 방어선이다.
      */
     private static final long DAILY_EARN_CAP = 6000;
+
+    /** 원장 조회(#135) 기본 페이지 크기 — MemoryService.DEFAULT_PAGE_SIZE와 같은 값. */
+    private static final int TRANSACTIONS_DEFAULT_PAGE_SIZE = 20;
 
     private final ShopMapper shopMapper;
     private final UserPreferenceMapper preferenceMapper;
@@ -176,6 +183,29 @@ public class ShopService {
     @Transactional(readOnly = true)
     public int countEarnedToday(long userId, String reason) {
         return shopMapper.countReasonToday(userId, reason, ClovTime.startOfTodayUtc());
+    }
+
+    /**
+     * 원장 조회(#135) — 골드가 왜 0인지 화면에서 확인할 방법이 없던 문제. 목록과 함께
+     * "오늘 얼마나 벌었나·상한에 얼마나 남았나"를 같이 준다(계약 §15-4).
+     *
+     * ⚠️ getWallet()과 마찬가지로 지갑을 지연 생성한다. /shop/wallet을 한 번도 안 부른
+     * 신규 유저가 이 API부터 먼저 호출하면, 지갑이 없어 SIGNUP_GRANT조차 안 보이는
+     * 빈 목록을 받는다 — 이슈가 풀려던 문제("골드가 왜 0인지 모른다")를 그대로
+     * 재현하게 되므로 여기서도 반드시 생성해야 한다.
+     */
+    @Transactional
+    public ShopTransactionsResponse getTransactions(long userId, int page, int size) {
+        getOrCreateWallet(userId);
+        int pageSize = size > 0 ? size : TRANSACTIONS_DEFAULT_PAGE_SIZE;
+        int offset = Math.max(page, 0) * pageSize;
+        List<WalletTransaction> rows = shopMapper.findTransactions(userId, pageSize, offset);
+        long earnedToday = shopMapper.sumEarnedToday(userId, ClovTime.startOfTodayUtc());
+        long remaining = Math.max(DAILY_EARN_CAP - earnedToday, 0);
+        return new ShopTransactionsResponse(
+                rows.stream().map(WalletTransactionResponse::from).toList(),
+                earnedToday, DAILY_EARN_CAP, remaining
+        );
     }
 
     /**

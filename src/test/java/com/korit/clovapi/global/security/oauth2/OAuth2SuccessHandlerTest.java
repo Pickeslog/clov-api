@@ -21,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OAuth2SuccessHandlerTest {
 
     private final OAuthOneTimeCodeStore codeStore = new OAuthOneTimeCodeStore();
-    private final OAuth2SuccessHandler handler = new OAuth2SuccessHandler(codeStore);
+    // 빈 문자열 = 운영 기본값(application.yaml 공통 블록과 동일) — request-relative 계산을 탄다.
+    private final OAuth2SuccessHandler handler = new OAuth2SuccessHandler(codeStore, "");
 
     @Test
     void redirectsBackToClovlovXyzWhenTheRequestArrivedThere() throws Exception {
@@ -33,8 +34,27 @@ class OAuth2SuccessHandlerTest {
         assertRedirectsToTheArrivalDomain("clovlabcalss.store");
     }
 
+    // #155 — 로컬은 프론트·백엔드 포트가 분리돼 있어 request-relative 계산이 백엔드 자기
+    // 자신으로 돌아가버린다. local-frontend-origin이 채워져 있으면 요청 도메인과 무관하게
+    // 그 고정 오리진으로 돌아가야 한다.
+    @Test
+    void redirectsToTheFixedLocalOriginRegardlessOfTheRequestDomainWhenConfigured() throws Exception {
+        OAuth2SuccessHandler localHandler = new OAuth2SuccessHandler(codeStore, "http://localhost:5173");
+        MockHttpServletRequest request = requestArrivingOn("localhost", 8080, "http");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        localHandler.onAuthenticationSuccess(request, response, authenticationFor(profile()));
+
+        URI redirect = URI.create(response.getRedirectedUrl());
+        assertEquals("http", redirect.getScheme());
+        assertEquals("localhost", redirect.getHost());
+        assertEquals(5173, redirect.getPort());
+        assertEquals("/oauth2/redirect", redirect.getPath());
+        assertTrue(redirect.getQuery().startsWith("code="));
+    }
+
     private void assertRedirectsToTheArrivalDomain(String domain) throws Exception {
-        MockHttpServletRequest request = requestArrivingOn(domain);
+        MockHttpServletRequest request = requestArrivingOn(domain, 443, "https");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(request, response, authenticationFor(profile()));
@@ -48,11 +68,11 @@ class OAuth2SuccessHandlerTest {
 
     // ForwardedHeaderFilter가 X-Forwarded-*를 이미 반영한 뒤의 요청 상태를 흉내낸다 —
     // 그 필터 자체의 동작은 스프링 프레임워크의 책임이라 여기서 다시 검증하지 않는다.
-    private static MockHttpServletRequest requestArrivingOn(String domain) {
+    private static MockHttpServletRequest requestArrivingOn(String domain, int port, String scheme) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/oauth2/code/kakao");
-        request.setScheme("https");
+        request.setScheme(scheme);
         request.setServerName(domain);
-        request.setServerPort(443);
+        request.setServerPort(port);
         return request;
     }
 

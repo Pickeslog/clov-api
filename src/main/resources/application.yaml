@@ -113,6 +113,13 @@ spring:
 
 client:
   url: http://localhost:5173
+
+app:
+  oauth:
+    # 로컬은 프론트(5173)·백엔드(8080)가 nginx 없이 분리돼 있어 OAuth2SuccessHandler가
+    # request 기준으로 계산하면 백엔드로 되돌아간다(#155). 운영은 이 값이 비어 있어(기본값)
+    # 기존 request-relative 동작(#147, 멀티 도메인)을 그대로 쓴다.
+    local-frontend-origin: http://localhost:5173
 ---
 
 spring:

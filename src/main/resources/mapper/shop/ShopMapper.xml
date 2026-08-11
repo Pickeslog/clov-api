@@ -26,6 +26,16 @@
         <result property="balance" column="balance"/>
     </resultMap>
 
+    <resultMap id="walletTransactionResultMap" type="com.korit.clovapi.domain.shop.entity.WalletTransaction">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="reason" column="reason"/>
+        <result property="amount" column="amount"/>
+        <result property="balanceAfter" column="balance_after"/>
+        <result property="referenceId" column="reference_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
     <select id="findCatalog" resultMap="shopItemResultMap">
         SELECT i.id, i.code, i.name, i.description, i.category, i.rarity, i.price, i.discount_rate,
                i.image_url, i.status, i.sort_order, i.created_at, i.updated_at,
@@ -109,5 +119,14 @@
     <select id="countReasonToday" resultType="int">
         SELECT COUNT(*) FROM wallet_transactions
         WHERE user_id = #{userId} AND reason = #{reason} AND created_at >= #{since}
+    </select>
+
+    <!-- #135 — 원장 조회. 최신순, MemoryMapper.findFeed와 같은 LIMIT/OFFSET 관례. -->
+    <select id="findTransactions" resultMap="walletTransactionResultMap">
+        SELECT id, user_id, reason, amount, balance_after, reference_id, created_at
+        FROM wallet_transactions
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
     </select>
 </mapper>
