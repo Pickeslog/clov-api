@@ -188,9 +188,15 @@ public class ShopService {
     /**
      * 원장 조회(#135) — 골드가 왜 0인지 화면에서 확인할 방법이 없던 문제. 목록과 함께
      * "오늘 얼마나 벌었나·상한에 얼마나 남았나"를 같이 준다(계약 §15-4).
+     *
+     * ⚠️ getWallet()과 마찬가지로 지갑을 지연 생성한다. /shop/wallet을 한 번도 안 부른
+     * 신규 유저가 이 API부터 먼저 호출하면, 지갑이 없어 SIGNUP_GRANT조차 안 보이는
+     * 빈 목록을 받는다 — 이슈가 풀려던 문제("골드가 왜 0인지 모른다")를 그대로
+     * 재현하게 되므로 여기서도 반드시 생성해야 한다.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public ShopTransactionsResponse getTransactions(long userId, int page, int size) {
+        getOrCreateWallet(userId);
         int pageSize = size > 0 ? size : TRANSACTIONS_DEFAULT_PAGE_SIZE;
         int offset = Math.max(page, 0) * pageSize;
         List<WalletTransaction> rows = shopMapper.findTransactions(userId, pageSize, offset);
