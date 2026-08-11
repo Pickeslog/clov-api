@@ -50,7 +50,9 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/swagger-ui/**", "/v3/api-docs/**")
+                        // /api/actuator/** — 배포 헬스체크(#108). 인증 없는 폴링 루프가 확인해야 하므로 열어둔다.
+                        .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/swagger-ui/**",
+                                "/v3/api-docs/**", "/api/actuator/**")
                         .permitAll()
                         .anyRequest().authenticated()
                 )
