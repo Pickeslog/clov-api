@@ -43,4 +43,8 @@ public interface ShopMapper {
     /** 사유별 유저 단위 일일 횟수 캡(예: EARN_MASCOT 하루 3회) 판정용. */
     int countReasonToday(@Param("userId") long userId, @Param("reason") String reason,
                           @Param("since") LocalDateTime since);
+
+    /** 원장 조회(#135) — 최신순, MemoryMapper.findFeed와 같은 page/size 관례. */
+    List<WalletTransaction> findTransactions(@Param("userId") long userId, @Param("limit") int limit,
+                                              @Param("offset") int offset);
 }

@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.shop.controller;
 
 import com.korit.clovapi.domain.shop.dto.PurchaseResponse;
 import com.korit.clovapi.domain.shop.dto.ShopItemsResponse;
+import com.korit.clovapi.domain.shop.dto.ShopTransactionsResponse;
 import com.korit.clovapi.domain.shop.dto.WalletResponse;
 import com.korit.clovapi.domain.shop.service.ShopService;
 import com.korit.clovapi.global.dto.EquippedItemResponse;
@@ -40,6 +41,15 @@ public class ShopController {
     @GetMapping("/api/v1/shop/inventory")
     public ApiResponse<ShopItemsResponse> findInventory(Authentication authentication) {
         return ApiResponse.success(shopService.findInventory(currentUserId(authentication)));
+    }
+
+    @GetMapping("/api/v1/shop/transactions")
+    public ApiResponse<ShopTransactionsResponse> findTransactions(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.success(shopService.getTransactions(currentUserId(authentication), page, size));
     }
 
     @PostMapping("/api/v1/shop/items/{itemId}/purchase")
