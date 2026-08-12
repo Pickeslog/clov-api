@@ -431,6 +431,14 @@ public class MemoryService {
         comment.setWriterId(userId);
         comment.setContent(request.content());
         commentMapper.insert(comment);
+
+        // #161 — 추억 작성자에게만 알린다(방 전체 팬아웃 아님). 본인이 자기 추억에 단
+        // 댓글은 다른 이벤트들의 "actor 본인 제외" 관례와 같은 이유로 알림을 안 보낸다.
+        if (memory.getWriterId() != userId) {
+            notificationService.notifyOne(memory.getRoomId(), memory.getWriterId(), userId,
+                    NotificationService.TYPE_FRIEND, NotificationService.SUB_COMMENT, memoryId, null);
+        }
+
         return CommentResponse.from(commentMapper.findById(comment.getId())
                 .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));
     }
