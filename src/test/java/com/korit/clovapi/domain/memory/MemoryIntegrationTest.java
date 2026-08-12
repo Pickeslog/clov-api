@@ -82,6 +82,10 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id IN (?, ?)", writerId, otherId);
+        // 약속 연결 추억 등록이 골드도 지급하면서(§15-4) writer가 user_wallets 행을 갖게 됐다 —
+        // 지우지 않으면 users DELETE가 FK(fk_wallet_transactions_user/fk_user_wallets_user)에 걸린다.
+        jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id IN (?, ?)", writerId, otherId);
+        jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id IN (?, ?)", writerId, otherId);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", writerId, otherId);
     }
 
@@ -182,6 +186,92 @@ class MemoryIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
                         .header("Authorization", "Bearer " + writerToken))
                 .andExpect(status().isNotFound());
+    }
+
+    // 자유 추억 골드는 두 관문을 다 통과해야 지급된다(계약 §15-4) — 본문 3자 이상 + 하루 10회 미만.
+    // 어느 쪽에 걸려도 글은 정상 저장되고 201이 나간다. earnedGold만 0이다.
+    //
+    // ★ 길이 조건은 "빈 글만 거르는" 장치라 경계가 낮다(3자). 채굴을 막는 것은 횟수 캡이다.
+    @Test
+    void freeMemoryGoldRequiresThreeCharsAndStopsAfterTenPerDay() throws Exception {
+        // ① 본문 2자 — 한 글자 모자라서 지급되지 않는다. 글은 정상 생성된다.
+        createFreeMemoryExpectingGold("AA", 0);
+
+        // ② 본문 3자 — 경계값이 지급된다(>= 판정임을 못박는다).
+        createFreeMemoryExpectingGold("BBB", 200);
+
+        // ③ 짧은 글은 횟수를 소모하지 않는다 — 지급이 없으면 원장 행도 없고, 횟수는 원장을 센다.
+        //    공백만 있는 본문도 trim 후 0자라 여기 걸린다.
+        for (int i = 0; i < 5; i++) {
+            createFreeMemoryExpectingGold("  ", 0);
+        }
+
+        // ④ 3자 이상으로 9건 더 채워 하루 10회를 소진한다(②의 1건 + 9건).
+        for (int i = 0; i < 9; i++) {
+            createFreeMemoryExpectingGold("D".repeat(25), 200);
+        }
+
+        // ⑤ 11번째는 429가 아니라 201 + earnedGold 0이다 — 글쓰기를 막는 건 골드 캡이 할 일이 아니다.
+        createFreeMemoryExpectingGold("E".repeat(25), 0);
+
+        // ⑥ 원장에는 지급된 10건만 남는다. 하루 최대 2,000(200 × 10)이다.
+        Long total = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions WHERE user_id = ? AND reason = ?",
+                Long.class, writerId, "EARN_MEMORY_FREE");
+        org.junit.jupiter.api.Assertions.assertEquals(2000L, total);
+    }
+
+    // 조회 응답에는 earnedGold가 실리지 않는다(계약 §10) — 그때는 지급이 일어나지 않으므로,
+    // 0을 보내면 "캡에 걸려 0원"과 구분되지 않는다.
+    @Test
+    void earnedGoldAppearsOnCreateOnlyNotOnRead() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Gold\",\"content\":\"" + "F".repeat(30) + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.earnedGold").value(200))
+                .andReturn();
+        long memoryId = Long.parseLong(JsonPath.read(created.getResponse().getContentAsString(), "$.data.id"));
+
+        mockMvc.perform(get("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.earnedGold").doesNotExist());
+
+        mockMvc.perform(patch("/api/v1/memories/{memoryId}", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Gold (edited)\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.earnedGold").doesNotExist());
+    }
+
+    // 하루 총 상한 합산은 EARN_ 접두사만 센다(계약 §15-4). ADMIN_GRANT(운영 지급)가 합산에
+    // 잡히면 지급받은 날 정상 획득이 통째로 막힌다.
+    //
+    // ★ 이 테스트는 LIKE 이스케이프가 깨지는 것도 같이 잡는다. ESCAPE 절이 빠지면 '_'가
+    // 임의의 한 글자로 매칭돼 다른 사유까지 합산에 걸리고, 이스케이프 문자로 백슬래시를
+    // 쓰면 MySQL이 문자열 리터럴에서 먼저 해석해 구문 오류가 난다.
+    @Test
+    void adminGrantIsExcludedFromTheDailyEarnCap() throws Exception {
+        // 상한(6,000)을 한참 넘는 운영 지급을 오늘 날짜로 원장에 직접 넣는다.
+        jdbcTemplate.update("INSERT INTO user_wallets (user_id, balance) VALUES (?, ?)"
+                + " ON DUPLICATE KEY UPDATE balance = VALUES(balance)", writerId, 100000);
+        jdbcTemplate.update("INSERT INTO wallet_transactions (user_id, reason, amount, balance_after)"
+                + " VALUES (?, 'ADMIN_GRANT', ?, ?)", writerId, 100000, 100000);
+
+        // 합산이 EARN_ 접두사로만 되면 오늘 획득량은 아직 0이라 정상 지급된다.
+        createFreeMemoryExpectingGold("G".repeat(25), 200);
+    }
+
+    private void createFreeMemoryExpectingGold(String content, int expectedGold) throws Exception {
+        mockMvc.perform(post("/api/v1/rooms/{roomId}/memories", roomId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Free\",\"content\":\"" + content + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.earnedGold").value(expectedGold));
     }
 
     @Test

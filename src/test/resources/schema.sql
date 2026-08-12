@@ -17,14 +17,12 @@ CREATE TABLE users (
   terms_agreed_at       DATETIME     NULL COMMENT '✚ 서비스 이용약관 동의 시각(이메일 가입 필수, 앱 레벨 강제)',
   privacy_agreed_at     DATETIME     NULL COMMENT '✚ 개인정보 처리방침 동의 시각(이메일 가입 필수, 앱 레벨 강제)',
   marketing_agreed_at   DATETIME     NULL COMMENT '✚ 마케팅 수신 동의 시각(선택, NULL=미동의)',
-  personal_invite_code  VARCHAR(20)  NOT NULL,
   is_anonymized         BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '탈퇴=익명화(기록 보존)',
   anonymized_at         DATETIME     NULL,
   created_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_users_email (email),
-  UNIQUE KEY uk_users_invite_code (personal_invite_code),
   UNIQUE KEY uk_users_oauth (oauth_provider, oauth_subject)  -- ✚ 소셜 계정 중복 방지
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -131,6 +129,7 @@ CREATE TABLE plans (
   description                  TEXT         NULL COMMENT '메모(장소/시간은 자유서식으로)',
   status                       VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED' COMMENT 'SCHEDULED/COMPLETED/CANCELED',
   memory_status                VARCHAR(20)  NOT NULL DEFAULT 'NONE' COMMENT 'NONE/CANDIDATE/WRITTEN/SKIPPED',
+  plan_type                    VARCHAR(20)  NOT NULL DEFAULT 'NORMAL' COMMENT 'NORMAL/BIRTHDAY — 약속의 종류(계약 §8-1)',
   completed_at                 DATETIME     NULL,
   memory_candidate_created_at  DATETIME     NULL,
   created_at                   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -245,6 +244,7 @@ CREATE TABLE lucky_letters (
   room_id      BIGINT      NOT NULL,
   sender_id    BIGINT      NOT NULL,
   receiver_id  BIGINT      NOT NULL,
+  title        VARCHAR(60) NULL COMMENT '선택 입력 — 미입력 시 NULL',
   content      TEXT        NOT NULL,
   emoji        VARCHAR(20) NULL COMMENT '미입력 시 프론트 기본값 💌',
   read_at      DATETIME    NULL,
@@ -276,7 +276,7 @@ CREATE TABLE notifications (
   recipient_id  BIGINT      NOT NULL,
   actor_id      BIGINT      NULL COMMENT '알림 유발자',
   type          VARCHAR(20) NOT NULL COMMENT '탭: NOTICE/FRIEND/JOIN',
-  sub_type      VARCHAR(30) NOT NULL COMMENT '이벤트: ROOM_UPDATE/MEMORY_WRITE/LETTER_RECEIVE/PLAN_CREATE/PLAN_COMPLETE/LEVEL_UP/JOIN_REQUEST/JOIN_ACCEPTED/ADMIN_NOTICE',
+  sub_type      VARCHAR(30) NOT NULL COMMENT '이벤트: ROOM_UPDATE/MEMORY_WRITE/LETTER_RECEIVE/PLAN_CREATE/PLAN_COMPLETE/LEVEL_UP/JOIN_REQUEST/JOIN_ACCEPTED/MEMBER_JOINED/ADMIN_NOTICE',
   reference_id  BIGINT      NULL COMMENT '유발 리소스 id',
   payload       JSON        NULL COMMENT '문구용 부가정보(예: {"level":3})',
   is_read       BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -376,7 +376,9 @@ CREATE TABLE user_inventory_items (
   CONSTRAINT fk_user_inventory_items_item FOREIGN KEY (item_id) REFERENCES shop_items(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE)
+-- 23. WALLET_TRANSACTIONS ✨ (지갑 변동 원장 — reason: SIGNUP_GRANT/PURCHASE/ADMIN_GRANT/
+--     EARN_MASCOT/EARN_MEMORY/EARN_MEMORY_FREE. 계약 §15-4 — 획득 사유만 EARN_ 접두사를
+--     쓰고, 하루 총 상한 합산이 그 접두사로 판정한다)
 CREATE TABLE wallet_transactions (
   id             BIGINT      NOT NULL AUTO_INCREMENT,
   user_id        BIGINT      NOT NULL,

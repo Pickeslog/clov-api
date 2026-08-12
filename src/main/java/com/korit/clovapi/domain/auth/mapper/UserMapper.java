@@ -19,10 +19,13 @@ public interface UserMapper {
             @Param("oauthSubject") String oauthSubject
     );
 
-    boolean existsByPersonalInviteCode(@Param("personalInviteCode") String personalInviteCode);
 
     void insert(User user);
     int updateProfile(@Param("userId") long userId, @Param("request") UpdateProfileRequest request);
     int updatePassword(@Param("userId") long userId, @Param("password") String password);
     int anonymize(@Param("userId") long userId);
+
+    /** #159 — 탈퇴 직후에도 이미 발급된 액세스 토큰이 TTL(30분) 동안 그대로 쓰이던 것을
+     *  JwtAuthenticationFilter에서 매 요청 확인하기 위한 가벼운 조회. */
+    boolean isAnonymized(@Param("id") long id);
 }

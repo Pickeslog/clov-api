@@ -5,7 +5,7 @@ import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
 import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
 import com.korit.clovapi.domain.notification.entity.Notification;
 import com.korit.clovapi.domain.notification.mapper.NotificationMapper;
-import com.korit.clovapi.domain.room.service.RoomService;
+import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.exception.DomainException;
 import com.korit.clovapi.global.exception.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -27,17 +27,29 @@ public class NotificationService {
     public static final String SUB_PLAN_COMPLETE = "PLAN_COMPLETE";
     public static final String SUB_LEVEL_UP = "LEVEL_UP";
     public static final String SUB_JOIN_REQUEST = "JOIN_REQUEST";
+    public static final String SUB_MEMBER_JOINED = "MEMBER_JOINED";
+    public static final String SUB_JOIN_ACCEPTED = "JOIN_ACCEPTED";
+    public static final String SUB_MEMBER_LEFT = "MEMBER_LEFT";
 
     private final NotificationMapper notificationMapper;
-    private final RoomService roomService;
+    private final RoomMemberMapper roomMemberMapper;
 
-    public NotificationService(NotificationMapper notificationMapper, RoomService roomService) {
+    public NotificationService(NotificationMapper notificationMapper, RoomMemberMapper roomMemberMapper) {
         this.notificationMapper = notificationMapper;
-        this.roomService = roomService;
+        this.roomMemberMapper = roomMemberMapper;
+    }
+
+    // RoomService.assertActiveMember와 같은 검사다. RoomService를 그대로 주입하면
+    // RoomService → NotificationService(#122, fanOut) → RoomService 순환 의존이 생겨서,
+    // InviteService처럼 각 도메인이 RoomMemberMapper로 자체 검사한다.
+    private void assertActiveMember(long roomId, long userId) {
+        if (roomMemberMapper.findActiveByRoomIdAndUserId(roomId, userId).isEmpty()) {
+            throw new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND);
+        }
     }
 
     public NotificationsResponse getNotifications(Long roomId, Long requesterId, String type, int page, int size) {
-        roomService.assertActiveMember(roomId, requesterId);
+        assertActiveMember(roomId, requesterId);
 
         int offset = page * size;
         List<NotificationResponse> items = notificationMapper.getNotifications(roomId, requesterId, type, offset, size)
@@ -61,7 +73,7 @@ public class NotificationService {
 
     @Transactional
     public ReadAllResponse markAllAsRead(Long roomId, Long requesterId) {
-        roomService.assertActiveMember(roomId, requesterId);
+        assertActiveMember(roomId, requesterId);
 
         int updatedCount = notificationMapper.markAllAsRead(roomId, requesterId);
         return new ReadAllResponse(updatedCount);

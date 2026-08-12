@@ -32,6 +32,14 @@ public class PlanService {
 
     private static final List<String> STAGES = List.of("PROPOSAL", "SCHEDULING", "CONFIRMED", "MEETING");
 
+    /**
+     * 계약 §8-1 — 약속의 종류. 생성 시점에만 정해지고 PATCH 로는 안 바뀐다.
+     * 값이 앞으로 늘 수 있어(기념일 등) 컬럼을 ENUM 이 아니라 VARCHAR 로 뒀고, 허용 목록은
+     * 여기 한 곳에서만 관리한다. 늘릴 때 프론트는 모르는 값을 NORMAL 처럼 그린다.
+     */
+    private static final List<String> PLAN_TYPES = List.of("NORMAL", "BIRTHDAY");
+    private static final String PLAN_TYPE_DEFAULT = "NORMAL";
+
     // 계약 §12 — 약속 등록 +3, 완료 +15.
     private static final int PLAN_CREATE_EXP = 3;
     private static final int PLAN_COMPLETE_EXP = 15;
@@ -66,6 +74,7 @@ public class PlanService {
         plan.setTitle(request.title());
         plan.setPlanDate(request.planDate());
         plan.setDescription(request.description());
+        plan.setPlanType(resolvePlanType(request.planType()));
         planMapper.insert(plan);
         expService.grant(roomId, userId, ExpService.ACTION_PLAN_CREATE, PLAN_CREATE_EXP, plan.getId());
         notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
@@ -236,6 +245,23 @@ public class PlanService {
 
     private Plan findPlan(long planId) {
         return planMapper.findById(planId).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND));
+    }
+
+    /**
+     * 계약 §8-1 — 생략·공백이면 NORMAL, 허용 목록 밖이면 400.
+     *
+     * <p>⚠️ plan_date 가 실제로 누군가의 생일인지는 <b>검증하지 않는다.</b> 생일은 바뀌고
+     * 멤버는 나가므로, 검증하면 약속 생성이 멤버 데이터에 묶인다. 이 값은 화면 표시용
+     * 힌트지 보안 경계가 아니다(§15 배경 상품의 잠금을 "화면 안내"로 둔 것과 같은 판단).
+     */
+    private String resolvePlanType(String requested) {
+        if (requested == null || requested.isBlank()) {
+            return PLAN_TYPE_DEFAULT;
+        }
+        if (!PLAN_TYPES.contains(requested)) {
+            throw new DomainException(ErrorCode.VALIDATION_FAILED);
+        }
+        return requested;
     }
 
     private void assertActiveMember(long roomId, long userId) {

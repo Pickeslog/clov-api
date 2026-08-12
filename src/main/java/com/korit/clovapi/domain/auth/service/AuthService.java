@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -34,8 +33,6 @@ import java.time.ZoneOffset;
 @Service
 public class AuthService {
 
-    private static final char[] BASE32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
@@ -72,7 +69,6 @@ public class AuthService {
         user.setTermsAgreedAt(now);
         user.setPrivacyAgreedAt(now);
         user.setMarketingAgreedAt(request.agreements().marketing() ? now : null);
-        user.setPersonalInviteCode(nextPersonalInviteCode());
         userMapper.insert(user);
 
         return authenticate(user);
@@ -103,7 +99,6 @@ public class AuthService {
         user.setTermsAgreedAt(now);
         user.setPrivacyAgreedAt(now);
         user.setMarketingAgreedAt(agreements.marketing() ? now : null);
-        user.setPersonalInviteCode(nextPersonalInviteCode());
         userMapper.insert(user);
         return authenticate(user);
     }
@@ -164,18 +159,6 @@ public class AuthService {
         } catch (JwtException | IllegalArgumentException exception) {
             throw new DomainException(ErrorCode.INVALID_TOKEN);
         }
-    }
-
-    private String nextPersonalInviteCode() {
-        String inviteCode;
-        do {
-            StringBuilder suffix = new StringBuilder(6);
-            for (int index = 0; index < 6; index++) {
-                suffix.append(BASE32[RANDOM.nextInt(BASE32.length)]);
-            }
-            inviteCode = "CLV-" + suffix;
-        } while (userMapper.existsByPersonalInviteCode(inviteCode));
-        return inviteCode;
     }
 
     private String hash(String token) {

@@ -1,5 +1,6 @@
 package com.korit.clovapi.global.security.filter;
 
+import com.korit.clovapi.domain.auth.mapper.UserMapper;
 import com.korit.clovapi.global.security.handler.JwtAuthenticationEntryPoint;
 import com.korit.clovapi.global.security.jwt.JwtClaims;
 import com.korit.clovapi.global.security.jwt.JwtTokenProvider;
@@ -27,13 +28,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final UserMapper userMapper;
 
     public JwtAuthenticationFilter(
             JwtTokenProvider jwtTokenProvider,
-            JwtAuthenticationEntryPoint authenticationEntryPoint
+            JwtAuthenticationEntryPoint authenticationEntryPoint,
+            UserMapper userMapper
     ) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -63,6 +67,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             JwtClaims claims = jwtTokenProvider.parse(authorization.substring(BEARER_PREFIX.length()));
             if (claims.tokenType() != TokenType.ACCESS) {
                 throw new JwtException("Refresh token cannot authenticate a request");
+            }
+            // #159 — 탈퇴(익명화) 직후에도 이미 발급된 액세스 토큰이 TTL(30분) 동안 다른 모든
+            // API에 그대로 통했다. stateless 인증에 PK 조회 한 번을 더해 막는다 — users.id가
+            // PK라 비용은 무시할 만하고, is_anonymized 필터가 있는 UserService.findUser()를
+            // 안 거치는 room/shop/letter 등 나머지 모든 컨트롤러에도 동일하게 적용된다.
+            if (userMapper.isAnonymized(claims.userId())) {
+                throw new JwtException("Anonymized account cannot authenticate a request");
             }
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

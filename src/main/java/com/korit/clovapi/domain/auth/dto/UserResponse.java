@@ -9,8 +9,7 @@ public record UserResponse(
         String email,
         String nickname,
         String profileImageUrl,
-        LocalDate birthdate,
-        String personalInviteCode
+        LocalDate birthdate
 ) {
     public static UserResponse from(User user) {
         return new UserResponse(
@@ -18,8 +17,7 @@ public record UserResponse(
                 user.getEmail(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
-                user.getBirthdate(),
-                user.getPersonalInviteCode()
+                user.getBirthdate()
         );
     }
 }

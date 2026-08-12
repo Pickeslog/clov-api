@@ -66,6 +66,11 @@ class ExpIntegrationTest extends IntegrationTestSupport {
         }
         for (Long createdUserId : userIds) {
             jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", createdUserId);
+            // 자유 추억도 골드를 지급하게 되면서(계약 §15-4) 본문 20자 이상인 테스트는
+            // user_wallets 행을 남긴다 — 지우지 않으면 users DELETE 가
+            // fk_wallet_transactions_user / fk_user_wallets_user 에 걸린다.
+            jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", createdUserId);
+            jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", createdUserId);
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", createdUserId);
         }
     }

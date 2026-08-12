@@ -60,6 +60,10 @@ class RoomIntegrationTest extends IntegrationTestSupport {
         }
         for (Long createdUserId : userIds) {
             jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", createdUserId);
+            // 마스코트 교감이 골드도 지급하면서(§15-4) 이 테스트 유저들도 user_wallets 행을 갖게 됐다 —
+            // 지우지 않으면 users DELETE가 FK(fk_wallet_transactions_user/fk_user_wallets_user)에 걸린다.
+            jdbcTemplate.update("DELETE FROM wallet_transactions WHERE user_id = ?", createdUserId);
+            jdbcTemplate.update("DELETE FROM user_wallets WHERE user_id = ?", createdUserId);
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", createdUserId);
         }
     }
@@ -121,6 +125,46 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
+    void findMyRoomsMemberAvatarsIncludeOnlyActiveMembersOrderedByJoinedAt() throws Exception {
+        long avatarRoom = createRoom(accessToken, "Avatar Room");
+        AuthUser second = signUp("Second Member");
+        AuthUser leftUser = signUp("Left Member");
+        // 뒤에 참여한 멤버가 joinedAt 오름차순에서 두 번째로 와야 한다.
+        jdbcTemplate.update(
+                "INSERT INTO room_members (room_id, user_id, status, joined_at) VALUES (?, ?, 'ACTIVE', DATE_ADD(NOW(), INTERVAL 1 MINUTE))",
+                avatarRoom, second.userId());
+        // LEFT 멤버는 memberAvatars에 보이면 안 된다(계약 §4-3, clov-api#141).
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'LEFT')",
+                avatarRoom, leftUser.userId());
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].memberAvatars.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[0].userId").value(String.valueOf(userId)))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[0].nickname").value("Room Test"))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[1].userId").value(String.valueOf(second.userId())))
+                .andExpect(jsonPath("$.data.items[0].memberAvatars[1].nickname").value("Second Member"));
+    }
+
+    @Test
+    void findMyRoomsMemberAvatarsAreGroupedIndependentlyPerRoom() throws Exception {
+        // 배치(IN 절) 조회가 방마다 결과를 뒤섞지 않는지 확인한다(clov-api#141 — N+1을 없애면서
+        // 서버 안에서 새로 N+1을 만들지 않는 것과 별개로, 그룹핑 자체가 틀리면 다른 방의 아바타가 섞인다).
+        long roomWithExtraMember = createRoom(accessToken, "Extra Member Room");
+        long roomAlone = createRoom(accessToken, "Room Alone");
+        AuthUser second = signUp("Extra Member");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id, status) VALUES (?, ?, 'ACTIVE')",
+                roomWithExtraMember, second.userId());
+
+        mockMvc.perform(get("/api/v1/rooms").header("Authorization", bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.name=='Extra Member Room')].memberAvatars[*].userId",
+                        org.hamcrest.Matchers.hasItems(String.valueOf(userId), String.valueOf(second.userId()))))
+                .andExpect(jsonPath("$.data.items[?(@.name=='Room Alone')].memberAvatars[*].userId",
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(String.valueOf(second.userId())))));
     }
 
     @Test
@@ -273,12 +317,16 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isFavorite").value(true));
 
-        for (int index = 0; index < 3; index++) {
+        // 교감 캡은 10회(계약 §12) — §15-4의 EARN_MASCOT 횟수와 같은 값이어야 한다.
+        // 매 회차 earnedGold 200이 나오는 것까지 본다: 하루 총 상한(6,000) 안이라 10회 전부
+        // 온전히 지급된다(10 × 200 = 2,000).
+        for (int index = 0; index < 10; index++) {
             mockMvc.perform(post("/api/v1/rooms/{roomId}/mascot/interact", roomId)
                             .header("Authorization", bearerToken()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.expDelta").value(2))
-                    .andExpect(jsonPath("$.data.remainingToday").value(2 - index));
+                    .andExpect(jsonPath("$.data.earnedGold").value(200))
+                    .andExpect(jsonPath("$.data.remainingToday").value(9 - index));
         }
         mockMvc.perform(post("/api/v1/rooms/{roomId}/mascot/interact", roomId)
                         .header("Authorization", bearerToken()))
@@ -287,15 +335,16 @@ class RoomIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/api/v1/rooms/{roomId}/exp-logs", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items.length()").value(3))
+                .andExpect(jsonPath("$.data.items.length()").value(10))
                 .andExpect(jsonPath("$.data.items[0].id").isString());
 
         mockMvc.perform(get("/api/v1/rooms/{roomId}/level", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.friendshipLevel").value(1))
-                .andExpect(jsonPath("$.data.expPoint").value(6))
+                // 교감 10회 × MASCOT_INTERACT 2 XP = 20 (캡을 3 → 10으로 올린 값을 따라간다)
+                .andExpect(jsonPath("$.data.expPoint").value(20))
                 .andExpect(jsonPath("$.data.expForNextLevel").value(100))
-                .andExpect(jsonPath("$.data.remainingToNextLevel").value(94));
+                .andExpect(jsonPath("$.data.remainingToNextLevel").value(80));
 
         mockMvc.perform(delete("/api/v1/rooms/{roomId}/members/me", roomId).header("Authorization", bearerToken()))
                 .andExpect(status().isOk())
@@ -305,6 +354,24 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.scheduledDeleteAt").doesNotExist());
+    }
+
+    @Test
+    void leavingRoomNotifiesRemainingMembersButNotTheLeaver() throws Exception {
+        // 계약 §13 MEMBER_LEFT(web-design-repository#50): 수신자=남은 멤버 전원(나간 사람 제외), actor=나간 사람.
+        long leaveRoomId = createRoom(accessToken, "Leave Notify Room");
+        AuthUser remainingMember = signUp("Remaining Member");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", leaveRoomId, remainingMember.userId());
+
+        mockMvc.perform(delete("/api/v1/rooms/{roomId}/members/me", leaveRoomId).header("Authorization", bearerToken()))
+                .andExpect(status().isOk());
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ?", Integer.class, leaveRoomId));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND recipient_id = ? AND actor_id = ? "
+                        + "AND type = 'FRIEND' AND sub_type = 'MEMBER_LEFT' AND reference_id = ?",
+                Integer.class, leaveRoomId, remainingMember.userId(), userId, leaveRoomId));
     }
 
     @Test
@@ -338,7 +405,7 @@ class RoomIntegrationTest extends IntegrationTestSupport {
                         org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
     }
 
-    // 마스코트 하루 3회 한도의 "하루"는 KST 자정에 리셋된다(#66).
+    // 마스코트 하루 10회 한도의 "하루"는 KST 자정에 리셋된다(#66).
     // UTC 자정으로 자르면 한국 사용자에게는 오전 9시에 리셋돼, 자정을 넘겨 날짜가 바뀌어도 한도가 그대로 소진 상태로 남는다.
     @Test
     void mascotDailyLimitResetsAtKoreaMidnightNotUtcMidnight() throws Exception {
@@ -350,11 +417,12 @@ class RoomIntegrationTest extends IntegrationTestSupport {
 
         // 어제(KST) 23:59 — 오늘 창 밖이라 한도에 잡히면 안 된다.
         insertMascotLog(mascotRoomId, startOfTodayUtc.minusMinutes(1));
-        // 오늘(KST) 00:01·00:02 — UTC 자정으로 자르면 이 둘이 "어제"로 새어나가 한도가 잘못 리셋된다.
-        insertMascotLog(mascotRoomId, startOfTodayUtc.plusMinutes(1));
-        insertMascotLog(mascotRoomId, startOfTodayUtc.plusMinutes(2));
+        // 오늘(KST) 00:01부터 9건 — UTC 자정으로 자르면 이들이 "어제"로 새어나가 한도가 잘못 리셋된다.
+        for (int minute = 1; minute <= 9; minute++) {
+            insertMascotLog(mascotRoomId, startOfTodayUtc.plusMinutes(minute));
+        }
 
-        // 오늘 2회 썼으므로 이번 1회는 성공하고 남은 횟수는 0이어야 한다.
+        // 오늘 9회 썼으므로 이번 1회는 성공하고 남은 횟수는 0이어야 한다.
         mockMvc.perform(post("/api/v1/rooms/{roomId}/mascot/interact", mascotRoomId)
                         .header("Authorization", bearerToken()))
                 .andExpect(status().isOk())

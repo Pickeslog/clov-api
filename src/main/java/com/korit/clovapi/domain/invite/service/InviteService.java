@@ -14,6 +14,7 @@ import com.korit.clovapi.domain.invite.entity.RoomInvite;
 import com.korit.clovapi.domain.invite.entity.RoomJoinRequest;
 import com.korit.clovapi.domain.invite.mapper.InviteMapper;
 import com.korit.clovapi.domain.invite.mapper.JoinRequestMapper;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.domain.room.entity.RoomMember;
 import com.korit.clovapi.global.exception.DomainException;
@@ -38,15 +39,18 @@ public class InviteService {
     private final InviteMapper inviteMapper;
     private final JoinRequestMapper joinRequestMapper;
     private final RoomMemberMapper roomMemberMapper;
+    private final NotificationService notificationService;
 
     public InviteService(
             InviteMapper inviteMapper,
             JoinRequestMapper joinRequestMapper,
-            RoomMemberMapper roomMemberMapper
+            RoomMemberMapper roomMemberMapper,
+            NotificationService notificationService
     ) {
         this.inviteMapper = inviteMapper;
         this.joinRequestMapper = joinRequestMapper;
         this.roomMemberMapper = roomMemberMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -154,7 +158,15 @@ public class InviteService {
         }
         RoomMember member = roomMemberMapper.findActiveByRoomIdAndUserId(request.getRoomId(), request.getUserId())
                 .orElseThrow(() -> new DomainException(ErrorCode.ROOM_MEMBER_NOT_FOUND));
-        inviteMapper.insertJoinNotifications(request.getRoomId(), userId, joinRequestId);
+        // 계약 §13 MEMBER_JOINED: 수신자=기존 멤버 전원(합류자 제외), actor=합류자(request.getUserId()).
+        // accept 호출자(userId=수락자)를 actor로 쓰면 안 된다 — clov-api #90.
+        // type=FRIEND(JOIN 아님) — JOIN 탭은 Notifications.jsx가 알림 테이블을 조회하지 않는
+        // 가입 신청 처리함이라 여기 두면 안 보인다(web-design-repository#51, clov-api #126).
+        notificationService.fanOut(request.getRoomId(), request.getUserId(),
+                NotificationService.TYPE_FRIEND, NotificationService.SUB_MEMBER_JOINED, joinRequestId, null);
+        // 계약 §13 JOIN_ACCEPTED: 수신자=신청자 본인, actor=수락자(userId) — MEMBER_JOINED와 actor가 반대다(#113).
+        notificationService.notifyOne(request.getRoomId(), request.getUserId(), userId,
+                NotificationService.TYPE_FRIEND, NotificationService.SUB_JOIN_ACCEPTED, joinRequestId, null);
         return new AcceptJoinRequestResponse(String.valueOf(member.getId()), String.valueOf(request.getRoomId()),
                 String.valueOf(request.getUserId()), undoDeadlineAt);
     }

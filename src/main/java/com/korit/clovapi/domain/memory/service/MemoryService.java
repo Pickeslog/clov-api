@@ -24,6 +24,8 @@ import com.korit.clovapi.domain.memory.mapper.ParticipantRow;
 import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.service.ExpService;
 import com.korit.clovapi.domain.room.service.RoomService;
+import com.korit.clovapi.domain.shop.entity.WalletTransaction;
+import com.korit.clovapi.domain.shop.service.ShopService;
 import com.korit.clovapi.global.dto.PresignRequest;
 import com.korit.clovapi.global.dto.PresignResponse;
 import com.korit.clovapi.global.dto.UserSummaryResponse;
@@ -51,6 +53,33 @@ public class MemoryService {
     // 프론트(clov-web Feed.jsx MEMORY_PHOTO_LIMIT)와 같은 값이어야 한다 — 여기가 낮으면
     // 화면에서 고를 수 있는 사진이 업로드에서 507로 튕긴다(실제로 프론트 15 vs 여기 10이었다).
     private static final int MAX_IMAGES_PER_MEMORY = 8;
+    // 약속 연결 추억(createFromPlan) 등록 1건당 지급 골드(계약 §15-4).
+    // 자체 횟수 캡이 없다 — 약속 개수에 제한이 없어 "만들기 → 완료 → 작성"을 반복할 수 있고,
+    // 이 경로를 막는 것은 일일 총 상한(ShopService.DAILY_EARN_CAP)뿐이다.
+    private static final long MEMORY_WRITE_GOLD = 300;
+    // 자유 추억(createFree, plan_id NULL) 등록 1건당 지급 골드(계약 §15-4, 리더 확정 2026-08-05).
+    private static final long MEMORY_FREE_GOLD = 200;
+    // 자유 추억은 약속·완료·다른 참여자가 필요 없어 혼자 무한히 쓸 수 있다. UNIQUE(plan_id,
+    // writer_id)도 NULL 중복을 허용해서 막지 못하므로 유저 단위 하루 횟수 캡을 건다.
+    private static final int MEMORY_FREE_DAILY_LIMIT = 10;
+    /**
+     * 자유 추억 골드의 본문 최소 길이(계약 §15-4, 리더 확정 2026-08-05).
+     *
+     * ★ 이 값은 <b>빈 글만 거르는 장치다. 채굴 방지 장치가 아니다.</b> 채굴은 위의
+     * MEMORY_FREE_DAILY_LIMIT(하루 10회)가 막는다 — 길이 조건은 몇 자로 잡든 붙여넣기면
+     * 뚫리므로 방어력을 여기에 기대면 안 된다.
+     *
+     * ★ 20에서 3으로 내렸다. 사진 위주 추억은 본문이 짧은 것이 정상인데(계약 §12가
+     * MEMORY_IMAGE_BONUS 로 사진을 별도 노력으로 인정한다) 20자 게이트가 그런 글을
+     * 벌하고 있었다. 사진 유무로 판정하고 싶지만 <b>작성 시점에는 사진 수를 알 수 없다</b> —
+     * 프로덕션은 추억 생성 → presign → R2 PUT → 커밋 순서고 CreateMemoryRequest 에
+     * 이미지 필드가 없다(계약 §12).
+     *
+     * ⚠️ 글 저장 자체는 막지 않는다. 3자 미만이어도 추억은 정상 생성되고 201이 나가며
+     * earnedGold 만 0이다 — 글쓰기를 막는 건 골드 캡이 할 일이 아니다(계약 §15-4).
+     * 여기서 400을 던지지 말 것.
+     */
+    private static final int MEMORY_FREE_MIN_CONTENT_LENGTH = 3;
 
     private final MemoryMapper memoryMapper;
     private final RoomService roomService;
@@ -59,10 +88,11 @@ public class MemoryService {
     private final StoragePresigner storagePresigner;
     private final ExpService expService;
     private final NotificationService notificationService;
+    private final ShopService shopService;
 
     public MemoryService(MemoryMapper memoryMapper, RoomService roomService, CommentMapper commentMapper,
                          MemoryImageMapper memoryImageMapper, StoragePresigner storagePresigner,
-                         ExpService expService, NotificationService notificationService) {
+                         ExpService expService, NotificationService notificationService, ShopService shopService) {
         this.memoryMapper = memoryMapper;
         this.roomService = roomService;
         this.commentMapper = commentMapper;
@@ -70,6 +100,7 @@ public class MemoryService {
         this.storagePresigner = storagePresigner;
         this.expService = expService;
         this.notificationService = notificationService;
+        this.shopService = shopService;
     }
 
     @Transactional
@@ -101,7 +132,9 @@ public class MemoryService {
             memoryMapper.deleteParticipants(existing.getId());
             saveTagsAndParticipants(existing.getId(), request);
             memoryMapper.updatePlanMemoryStatusWritten(planId);
-            return getDetail(existing.getId(), userId);
+            // 되살린 행은 처음 작성 때 이미 EXP·골드를 받았다. earnedGold 는 0으로 명시해
+            // 화면이 "이번엔 안 받았다"를 알 수 있게 한다(필드를 빼면 조회 응답과 같아진다).
+            return getDetail(existing.getId(), userId).withEarnedGold(0);
         }
 
         Memory memory = buildMemory(roomId, planId, userId, request);
@@ -110,9 +143,13 @@ public class MemoryService {
         memoryMapper.updatePlanMemoryStatusWritten(planId);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        // 삭제 후 재작성(위 revive 분기)엔 EXP처럼 골드도 다시 주지 않는다 — 캡이 있어도
+        // 삭제·재작성을 반복하면 그만큼 하루 상한을 계속 다시 채울 수 있어서다.
+        long earned = shopService.earnGold(userId, WalletTransaction.REASON_EARN_MEMORY,
+                MEMORY_WRITE_GOLD, memory.getId());
         notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
                 NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
-        return getDetail(memory.getId(), userId);
+        return getDetail(memory.getId(), userId).withEarnedGold(earned);
     }
 
     @Transactional
@@ -124,9 +161,34 @@ public class MemoryService {
         saveTagsAndParticipants(memory.getId(), request);
         expService.grant(roomId, userId, ExpService.ACTION_MEMORY_WRITE,
                 ExpService.memoryWriteExp(request.content()), memory.getId());
+        long earned = earnFreeMemoryGold(userId, request, memory.getId());
         notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND,
                 NotificationService.SUB_MEMORY_WRITE, memory.getId(), null);
-        return getDetail(memory.getId(), userId);
+        return getDetail(memory.getId(), userId).withEarnedGold(earned);
+    }
+
+    /**
+     * 자유 추억 골드 지급 판정(계약 §15-4). 두 조건을 다 통과해야 지급한다 —
+     * 본문 {@value #MEMORY_FREE_MIN_CONTENT_LENGTH}자 이상, 그리고 오늘 지급 횟수가
+     * {@value #MEMORY_FREE_DAILY_LIMIT}회 미만.
+     *
+     * ⚠️ 어느 쪽에 걸려도 글은 이미 저장됐고 EXP도 지급됐다. 여기서는 0을 반환할 뿐
+     * 예외를 던지지 않는다 — 글쓰기를 막는 건 골드 캡이 할 일이 아니다.
+     *
+     * 횟수는 사유별로 세므로(countEarnedToday) EARN_MEMORY_FREE 만 센다. 약속 연결 추억은
+     * 이 캡에 안 걸린다 — 사유를 합쳤다면 하루에 약속을 열 바퀴 넘게 완주해도 막혔을 것이다.
+     */
+    private long earnFreeMemoryGold(long userId, CreateMemoryRequest request, long memoryId) {
+        String content = request.content();
+        if (content == null || content.trim().length() < MEMORY_FREE_MIN_CONTENT_LENGTH) {
+            return 0;
+        }
+        if (shopService.countEarnedToday(userId, WalletTransaction.REASON_EARN_MEMORY_FREE)
+                >= MEMORY_FREE_DAILY_LIMIT) {
+            return 0;
+        }
+        return shopService.earnGold(userId, WalletTransaction.REASON_EARN_MEMORY_FREE,
+                MEMORY_FREE_GOLD, memoryId);
     }
 
     public MemoryFeedResponse findFeed(long roomId, long userId, String month, Long writerId, String tag,

@@ -85,6 +85,25 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items[?(@.id=='" + cheapItemId + "')].owned").value(false));
     }
 
+    // 내린 상품(RETIRED)은 카탈로그에 안 나온다. 이 조건이 빠져 있으면 목록에는 보이는데
+    // 구매만 ITEM_NOT_PURCHASABLE로 막혀 "보이는데 못 사는" 상태가 된다.
+    // 아래 purchaseFailsWhen... 테스트가 구매 차단은 이미 지키고 있어서, 목록 쪽은 여기서 못박는다.
+    @Test
+    void catalogHidesRetiredItemsButInventoryKeepsThem() throws Exception {
+        mockMvc.perform(get("/api/v1/shop/items")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + retiredItemId + "')]").isEmpty())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + skinItemId + "')]").isNotEmpty());
+
+        // 카테고리 필터를 걸어도 마찬가지다(RETIRED 항목이 SKIN이라 같은 필터에 걸린다).
+        mockMvc.perform(get("/api/v1/shop/items")
+                        .header("Authorization", "Bearer " + token)
+                        .param("category", "SKIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[?(@.id=='" + retiredItemId + "')]").isEmpty());
+    }
+
     @Test
     void purchaseDeductsBalanceRecordsLedgerAndMovesItemIntoInventory() throws Exception {
         mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)
@@ -182,6 +201,52 @@ class ShopIntegrationTest extends IntegrationTestSupport {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.equippedItem").doesNotExist());
+    }
+
+    // #135 — 원장 조회. 가입 직후엔 SIGNUP_GRANT 한 줄뿐이고, 구매하면 최신순으로 하나 더 쌓인다.
+    @Test
+    void transactionsListSignupGrantAndPurchaseNewestFirst() throws Exception {
+        mockMvc.perform(get("/api/v1/shop/transactions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].reason").value("SIGNUP_GRANT"))
+                .andExpect(jsonPath("$.data.items[0].balanceAfter").value(1000))
+                // SIGNUP_GRANT는 EARN_ 접두사가 아니라 하루 획득 상한에 안 잡힌다.
+                .andExpect(jsonPath("$.data.earnedToday").value(0))
+                .andExpect(jsonPath("$.data.dailyCap").value(6000))
+                .andExpect(jsonPath("$.data.remaining").value(6000));
+
+        mockMvc.perform(post("/api/v1/shop/items/{itemId}/purchase", cheapItemId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/shop/transactions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].reason").value("PURCHASE"))
+                .andExpect(jsonPath("$.data.items[0].amount").value(-100))
+                .andExpect(jsonPath("$.data.items[0].referenceId").value(String.valueOf(cheapItemId)))
+                .andExpect(jsonPath("$.data.items[1].reason").value("SIGNUP_GRANT"));
+    }
+
+    // 오늘 누적/남은 상한 — 이게 이슈의 핵심이다("골드가 왜 0인지 확인할 방법이 없다").
+    @Test
+    void transactionsReportEarnedTodayAndRemainingCap() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO wallet_transactions (user_id, reason, amount, balance_after) VALUES (?, ?, ?, ?)",
+                userId, "EARN_MASCOT", 200, 1200);
+        jdbcTemplate.update(
+                "INSERT INTO wallet_transactions (user_id, reason, amount, balance_after) VALUES (?, ?, ?, ?)",
+                userId, "EARN_MEMORY", 300, 1500);
+
+        mockMvc.perform(get("/api/v1/shop/transactions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(3))
+                .andExpect(jsonPath("$.data.earnedToday").value(500))
+                .andExpect(jsonPath("$.data.remaining").value(5500));
     }
 
     private long insertItem(String code, String name, String category, String rarity, long price,

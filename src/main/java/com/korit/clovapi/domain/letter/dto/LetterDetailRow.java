@@ -15,6 +15,7 @@ public class LetterDetailRow {
     private Long receiverId;
     private String receiverNickname;
     private String receiverProfileImageUrl;
+    private String title;
     private String content;
     private String emoji;
     private LocalDateTime readAt;
@@ -35,6 +36,8 @@ public class LetterDetailRow {
     public void setReceiverNickname(String receiverNickname) { this.receiverNickname = receiverNickname; }
     public String getReceiverProfileImageUrl() { return receiverProfileImageUrl; }
     public void setReceiverProfileImageUrl(String receiverProfileImageUrl) { this.receiverProfileImageUrl = receiverProfileImageUrl; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public String getEmoji() { return emoji; }

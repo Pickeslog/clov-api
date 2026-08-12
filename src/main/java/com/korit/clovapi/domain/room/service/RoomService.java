@@ -13,6 +13,7 @@ import com.korit.clovapi.domain.room.dto.StatusMessageResponse;
 import com.korit.clovapi.domain.room.dto.UpdateRoomRequest;
 import com.korit.clovapi.domain.room.entity.Room;
 import com.korit.clovapi.domain.room.entity.RoomMember;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.mapper.RoomMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.dto.PresignRequest;
@@ -25,7 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class RoomService {
@@ -33,11 +38,14 @@ public class RoomService {
     private final RoomMapper roomMapper;
     private final RoomMemberMapper roomMemberMapper;
     private final StoragePresigner storagePresigner;
+    private final NotificationService notificationService;
 
-    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper, StoragePresigner storagePresigner) {
+    public RoomService(RoomMapper roomMapper, RoomMemberMapper roomMemberMapper, StoragePresigner storagePresigner,
+                        NotificationService notificationService) {
         this.roomMapper = roomMapper;
         this.roomMemberMapper = roomMemberMapper;
         this.storagePresigner = storagePresigner;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -77,9 +85,25 @@ public class RoomService {
     }
 
     public RoomSummariesResponse findMyRooms(long userId) {
-        return new RoomSummariesResponse(roomMapper.findSummariesByMemberUserId(userId).stream()
-                .map(RoomSummaryResponse::from)
+        List<Room> rooms = roomMapper.findSummariesByMemberUserId(userId);
+        Map<Long, List<RoomSummaryResponse.MemberAvatar>> avatarsByRoomId = findMemberAvatarsByRoomIds(
+                rooms.stream().map(Room::getId).toList());
+        return new RoomSummariesResponse(rooms.stream()
+                .map(room -> RoomSummaryResponse.from(room, avatarsByRoomId.getOrDefault(room.getId(), List.of())))
                 .toList());
+    }
+
+    // roomIds 전체를 한 번의 쿼리로 묶어서 조회한다(N+1 방지, 계약 §4-3·§6·clov-api#141).
+    // 방마다 findByRoomId를 따로 부르면 문제가 클라이언트에서 서버로 옮겨갈 뿐이다.
+    private Map<Long, List<RoomSummaryResponse.MemberAvatar>> findMemberAvatarsByRoomIds(List<Long> roomIds) {
+        if (roomIds.isEmpty()) {
+            return Map.of();
+        }
+        return roomMemberMapper.findActiveByRoomIds(roomIds).stream()
+                .collect(Collectors.groupingBy(
+                        RoomMember::getRoomId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(RoomSummaryResponse.MemberAvatar::from, Collectors.toList())));
     }
 
     @Transactional
@@ -101,6 +125,10 @@ public class RoomService {
     public void leave(long roomId, long userId) {
         assertActiveMember(roomId, userId);
         roomMemberMapper.leave(roomId, userId, LocalDateTime.now(ZoneOffset.UTC));
+        // 계약 §13 MEMBER_LEFT(web-design-repository#50): 수신자=남은 멤버 전원(나간 사람 제외), actor=나간 사람.
+        // referenceId는 joinRequestId 같은 참조 대상이 없어 ROOM_UPDATE·LEVEL_UP과 같이 roomId를 쓴다.
+        // 마지막 멤버가 나가는 경우 팬아웃 대상이 0명이라 자연히 no-op(별도 분기 불필요).
+        notificationService.fanOut(roomId, userId, NotificationService.TYPE_FRIEND, NotificationService.SUB_MEMBER_LEFT, roomId, null);
         if (roomMemberMapper.countActiveByRoomId(roomId) == 0) {
             roomMapper.updateStatusInactive(roomId, LocalDateTime.now(ZoneOffset.UTC).plusDays(30));
         }

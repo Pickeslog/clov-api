@@ -15,18 +15,19 @@
         <result property="description" column="description"/>
         <result property="status" column="status"/>
         <result property="memoryStatus" column="memory_status"/>
+        <result property="planType" column="plan_type"/>
         <result property="completedAt" column="completed_at"/>
         <result property="createdAt" column="created_at"/>
     </resultMap>
 
     <sql id="planColumns">
         p.id, p.room_id, p.writer_id, u.nickname, u.profile_image_url, p.title, p.plan_date,
-        p.description, p.status, p.memory_status, p.completed_at, p.created_at
+        p.description, p.status, p.memory_status, p.plan_type, p.completed_at, p.created_at
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO plans (room_id, writer_id, title, plan_date, description)
-        VALUES (#{roomId}, #{writerId}, #{title}, #{planDate}, #{description})
+        INSERT INTO plans (room_id, writer_id, title, plan_date, description, plan_type)
+        VALUES (#{roomId}, #{writerId}, #{title}, #{planDate}, #{description}, #{planType})
     </insert>
 
     <select id="findById" resultMap="planResultMap">
