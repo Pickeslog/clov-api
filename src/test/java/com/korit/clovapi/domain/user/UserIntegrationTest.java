@@ -158,6 +158,19 @@ class UserIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    // #159 — 탈퇴(익명화) 직후에도 이미 발급된 액세스 토큰이 TTL(30분) 동안 그대로 통했다.
+    // is_anonymized 체크가 있는 UserService.findUser()는 user 컨트롤러만 거치므로,
+    // 그걸 안 거치는 shop 도메인으로 재현한다 — JwtAuthenticationFilter 자체에서 막혀야 한다.
+    @Test
+    void accessTokenIssuedBeforeWithdrawalIsRejectedImmediatelyAfter() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/shop/wallet").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
     @Test
     void profileImagePresignReturnsSignedPutUrl() throws Exception {
         mockMvc.perform(post("/api/v1/users/me/profile-image/presign").header(HttpHeaders.AUTHORIZATION, bearer())
