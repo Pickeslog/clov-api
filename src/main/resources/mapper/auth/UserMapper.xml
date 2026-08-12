@@ -63,8 +63,21 @@
     <update id="updatePassword">
         UPDATE users SET password = #{password} WHERE id = #{userId}
     </update>
+    <!-- #157 — email까지 비워야 두 가지가 동시에 풀린다: ①로그인 차단(login()이 findByEmail로
+         찾으므로 이 컬럼이 바뀌면 자연히 못 찾는다) ②같은 이메일로 재가입 허용(uk_users_email이
+         유일키라 원래 값을 그대로 두면 영원히 못 쓴다). id를 붙여 유일성을 보장하고 .invalid는
+         RFC 2606 예약 도메인(실제로 존재하거나 발송 가능한 주소가 아님이 보장됨)이라 골랐다.
+         password·oauth_*도 같이 비워야 소셜 계정 재가입도 같은 방식으로 자연히 풀린다
+         (uk_users_oauth 복합 유니크는 NULL끼리 서로 다른 값 취급이라 충돌 없음). -->
     <update id="anonymize">
-        UPDATE users SET is_anonymized = true, nickname = '언노운', anonymized_at = CURRENT_TIMESTAMP
+        UPDATE users SET
+            is_anonymized = true,
+            nickname = '언노운',
+            anonymized_at = CURRENT_TIMESTAMP,
+            email = CONCAT('anonymized-', id, '@clov.invalid'),
+            password = NULL,
+            oauth_provider = NULL,
+            oauth_subject = NULL
         WHERE id = #{userId}
     </update>
 </mapper>
