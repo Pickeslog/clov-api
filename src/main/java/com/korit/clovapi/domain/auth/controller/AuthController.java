@@ -6,6 +6,7 @@ import com.korit.clovapi.domain.auth.dto.LoginRequest;
 import com.korit.clovapi.domain.auth.dto.OAuthConsentRequest;
 import com.korit.clovapi.domain.auth.dto.OAuthExchangeRequest;
 import com.korit.clovapi.domain.auth.dto.OAuthExchangeResponse;
+import com.korit.clovapi.domain.auth.dto.OAuthLinkConfirmRequest;
 import com.korit.clovapi.domain.auth.dto.PasswordResetTokenStatusResponse;
 import com.korit.clovapi.domain.auth.dto.RefreshTokenRequest;
 import com.korit.clovapi.domain.auth.dto.ResetPasswordRequest;
@@ -92,5 +93,10 @@ public class AuthController {
     @PostMapping("/oauth/consent")
     public ApiResponse<AuthResponse> consent(@Valid @RequestBody OAuthConsentRequest request) {
         return ApiResponse.success(oauthAuthService.consent(request));
+    }
+
+    @PostMapping("/oauth/link-confirm")
+    public ApiResponse<AuthResponse> linkConfirm(@Valid @RequestBody OAuthLinkConfirmRequest request) {
+        return ApiResponse.success(oauthAuthService.linkConfirm(request));
     }
 }
