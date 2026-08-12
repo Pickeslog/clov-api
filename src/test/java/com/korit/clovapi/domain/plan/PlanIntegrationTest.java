@@ -47,6 +47,8 @@ class PlanIntegrationTest extends IntegrationTestSupport {
 
     @AfterEach
     void cleanUp() {
+        // memories도 plans FK를 물고 있어(fk_memories_plan), plans보다 먼저 지운다.
+        jdbcTemplate.update("DELETE FROM memories WHERE room_id = ?", roomId);
         List<Long> planIds = jdbcTemplate.queryForList(
                 "SELECT id FROM plans WHERE room_id = ?",
                 Long.class,
@@ -117,6 +119,45 @@ class PlanIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/plans/{planId}", planId).header("Authorization", tokenFor(userId)))
                 .andExpect(status().isNotFound());
+    }
+
+    // clov-api#167 — memories.plan_id FK(fk_memories_plan)가 살아 있어서, 그 약속에 추억이
+    // 하나라도 있으면(소프트 삭제된 것 포함) 예전엔 plans 삭제가 FK 위반으로 실패했다.
+    // 지금은 삭제 전에 연결된 추억의 plan_id를 NULL로 돌려(FREE MEMORY 전환) 통과시킨다.
+    @Test
+    void deletePlanDetachesLinkedMemoriesInsteadOfFailing() throws Exception {
+        long planId = createPlan(tokenFor(userId), "Deletable plan with memories", "2026-07-25");
+
+        long activeMemoryId = insertMemory(roomId, planId, userId, "Active memory", false);
+        long secondWriterId = insertUser("Second Writer");
+        jdbcTemplate.update("INSERT INTO room_members (room_id, user_id) VALUES (?, ?)", roomId, secondWriterId);
+        long deletedMemoryId = insertMemory(roomId, planId, secondWriterId, "Soft-deleted memory", true);
+
+        mockMvc.perform(delete("/api/v1/plans/{planId}", planId).header("Authorization", tokenFor(userId)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/plans/{planId}", planId).header("Authorization", tokenFor(userId)))
+                .andExpect(status().isNotFound());
+
+        // 게시글 자체는 안 지워지고, plan_id만 NULL로 풀려서 FREE MEMORY가 된다.
+        org.junit.jupiter.api.Assertions.assertNull(
+                jdbcTemplate.queryForObject("SELECT plan_id FROM memories WHERE id = ?", Long.class, activeMemoryId));
+        org.junit.jupiter.api.Assertions.assertNull(
+                jdbcTemplate.queryForObject("SELECT plan_id FROM memories WHERE id = ?", Long.class, deletedMemoryId));
+        org.junit.jupiter.api.Assertions.assertEquals(1,
+                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM memories WHERE id = ?", Integer.class, activeMemoryId));
+        org.junit.jupiter.api.Assertions.assertEquals(1,
+                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM memories WHERE id = ?", Integer.class, deletedMemoryId));
+    }
+
+    private long insertMemory(long forRoomId, long planId, long writerId, String title, boolean deleted) {
+        jdbcTemplate.update(
+                "INSERT INTO memories (room_id, plan_id, writer_id, title, deleted_at) VALUES (?, ?, ?, ?, ?)",
+                forRoomId, planId, writerId, title, deleted ? java.time.LocalDateTime.now() : null
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM memories WHERE room_id = ? AND writer_id = ? AND title = ? ORDER BY id DESC LIMIT 1",
+                Long.class, forRoomId, writerId, title
+        );
     }
 
     @Test
