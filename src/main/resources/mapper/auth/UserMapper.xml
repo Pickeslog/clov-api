@@ -80,4 +80,10 @@
             oauth_subject = NULL
         WHERE id = #{userId}
     </update>
+
+    <!-- #159 — EXISTS로 감싸서 행이 아예 없을 때도(위조된 id 등) null이 아니라 항상 false를
+         반환한다(ShopMapper.existsInInventory와 같은 관례). -->
+    <select id="isAnonymized" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM users WHERE id = #{id} AND is_anonymized = true)
+    </select>
 </mapper>
