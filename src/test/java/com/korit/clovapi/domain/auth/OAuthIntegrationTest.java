@@ -146,11 +146,12 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
         Long userCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Long.class, email);
         assertTrue(userCount != null && userCount == 1L, "새 계정이 따로 생기면 안 된다");
 
-        // 재사용된 토큰 → 401.
+        // 재사용된 토큰 → 400(OAUTH_CODE_INVALID는 실제로 BAD_REQUEST로 매핑돼 있다,
+        // ErrorCode.java:52 — 위 exchange 재사용 케이스와 동일한 매핑).
         mockMvc.perform(post("/api/v1/auth/oauth/link-confirm")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"registrationToken\":\"" + linkToken + "\"}"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("OAUTH_CODE_INVALID"));
     }
 
