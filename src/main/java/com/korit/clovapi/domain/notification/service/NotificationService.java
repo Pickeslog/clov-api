@@ -3,6 +3,7 @@ package com.korit.clovapi.domain.notification.service;
 import com.korit.clovapi.domain.notification.dto.NotificationResponse;
 import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
 import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
+import com.korit.clovapi.domain.notification.dto.UnreadResponse;
 import com.korit.clovapi.domain.notification.entity.Notification;
 import com.korit.clovapi.domain.notification.mapper.NotificationMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
@@ -93,5 +94,10 @@ public class NotificationService {
     public void notifyOne(long roomId, long recipientId, Long actorId, String type, String subType,
                           Long referenceId, String payload) {
         notificationMapper.insertOne(roomId, recipientId, actorId, type, subType, referenceId, payload);
+    }
+
+    /** 종 아이콘 배지(계약 §13, web-design-repository#89) — room 무관 유저 전체 기준. */
+    public UnreadResponse getUnread(long recipientId) {
+        return new UnreadResponse(notificationMapper.existsUnread(recipientId));
     }
 }
