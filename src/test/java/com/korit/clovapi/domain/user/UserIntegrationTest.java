@@ -115,6 +115,49 @@ class UserIntegrationTest extends IntegrationTestSupport {
         assert "언노운".equals(nickname);
     }
 
+    // #157 — 탈퇴 후에도 원래 이메일·비밀번호로 로그인이 그대로 되고, 같은 이메일로 재가입도
+    // 안 되던 문제. email/password/oauth_*까지 익명화해서 두 가지를 동시에 막는다.
+    @Test
+    void deleteAnonymizesEmailAndCredentialsSoOldLoginIsBlockedAndEmailIsFreed() throws Exception {
+        mockMvc.perform(delete("/api/v1/users/me").header(HttpHeaders.AUTHORIZATION, bearer()))
+                .andExpect(status().isOk());
+
+        String anonymizedEmail = jdbcTemplate.queryForObject(
+                "SELECT email FROM users WHERE id = ?", String.class, userId);
+        Boolean hasPassword = jdbcTemplate.queryForObject(
+                "SELECT password IS NOT NULL FROM users WHERE id = ?", Boolean.class, userId);
+        assert ("anonymized-" + userId + "@clov.invalid").equals(anonymizedEmail);
+        assert Boolean.FALSE.equals(hasPassword);
+
+        // 원래 이메일·비밀번호로는 더 이상 로그인이 안 된다(계정을 못 찾으니 INVALID_CREDENTIALS).
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+
+        // 같은 이메일로 재가입은 완전히 새 계정(새 id)이 된다 — 옛 계정 기록과 안 섞인다.
+        long newUserId = -1;
+        try {
+            MvcResult resignup = mockMvc.perform(post("/api/v1/auth/signup")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD + "\","
+                                    + "\"nickname\":\"새사람\","
+                                    + "\"agreements\":{\"service\":true,\"privacy\":true,\"marketing\":false}}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.data.user.email").value(email))
+                    .andReturn();
+            newUserId = Long.parseLong(JsonPath.read(resignup.getResponse().getContentAsString(), "$.data.user.id"));
+            assert newUserId != userId;
+        } finally {
+            if (newUserId != -1) {
+                jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", newUserId);
+                jdbcTemplate.update("DELETE FROM user_preferences WHERE user_id = ?", newUserId);
+                jdbcTemplate.update("DELETE FROM users WHERE id = ?", newUserId);
+            }
+        }
+    }
+
     @Test
     void profileImagePresignReturnsSignedPutUrl() throws Exception {
         mockMvc.perform(post("/api/v1/users/me/profile-image/presign").header(HttpHeaders.AUTHORIZATION, bearer())
