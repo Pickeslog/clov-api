@@ -31,6 +31,7 @@ public class NotificationService {
     public static final String SUB_JOIN_ACCEPTED = "JOIN_ACCEPTED";
     public static final String SUB_MEMBER_LEFT = "MEMBER_LEFT";
     public static final String SUB_COMMENT = "COMMENT";
+    public static final String SUB_LETTER_RECEIVE = "LETTER_RECEIVE";
 
     private final NotificationMapper notificationMapper;
     private final RoomMemberMapper roomMemberMapper;
