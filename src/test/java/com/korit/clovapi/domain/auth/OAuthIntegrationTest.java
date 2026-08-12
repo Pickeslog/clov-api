@@ -106,6 +106,20 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    // #165 — 로그아웃 후 재로그인 시 제공자 세션을 그대로 타지 않고 재인증하도록
+    // prompt=login을 인가 요청에 얹는다. 동적 redirect_uri(#147) 로직과 안 깨지는지도 확인.
+    @Test
+    void addsLoginPromptToEveryAuthorizationRequest() throws Exception {
+        for (String provider : new String[]{"kakao", "naver", "google"}) {
+            MvcResult result = mockMvc.perform(get("/oauth2/authorization/" + provider))
+                    .andExpect(status().is3xxRedirection())
+                    .andReturn();
+            String location = result.getResponse().getHeader("Location");
+            assertTrue(location != null && location.contains("prompt=login"),
+                    provider + " 인가 요청에 prompt=login이 있어야 한다: " + location);
+        }
+    }
+
     // {baseUrl} 플레이스홀더(application.yaml)가 요청 도메인마다 다른 redirect_uri를
     // provider에 보내는지 확인한다 — clovlabcalss.store·clovlov.xyz 병행 지원의 핵심(#147).
     @Test
