@@ -76,4 +76,12 @@
         )
     </select>
 
+    <!-- 방 안 종 아이콘 배지(계약 §13, clov-api#174). 방 목록의 existsUnread(전체)와 달리 이 방만 기준. -->
+    <select id="existsUnreadInRoom" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM notifications
+            WHERE recipient_id = #{recipientId} AND room_id = #{roomId} AND is_read = false
+        )
+    </select>
+
 </mapper>
