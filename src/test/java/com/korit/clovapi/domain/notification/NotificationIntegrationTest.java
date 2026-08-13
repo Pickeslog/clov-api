@@ -160,6 +160,45 @@ class NotificationIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    // clov-api#174 — 방 안 배지는 이 방만 기준이어야 한다(위 unreadIsRoomAgnostic 테스트와 대비).
+    @Test
+    void unreadInRoomIsRoomScoped() throws Exception {
+        // setUp에서 memberId 앞으로 이 방에 안읽음 2건이 이미 있다.
+        mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications/unread")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasUnread").value(true));
+
+        long otherRoomId = insertRoom();
+        insertMember(otherRoomId, memberId);
+        insertNotification(otherRoomId, memberId, "FRIEND");
+        try {
+            // 이 방(roomId)만 읽어도 다른 방(otherRoomId)의 배지엔 영향 없다.
+            mockMvc.perform(patch("/api/v1/rooms/" + roomId + "/notifications/read-all")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
+                    .andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications/unread")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.hasUnread").value(false));
+            // 다른 방은 안읽음이 그대로 남아 있어야 한다 — 전체 기준(existsUnread)과 달리 여기서 안 꺼진다.
+            mockMvc.perform(get("/api/v1/rooms/" + otherRoomId + "/notifications/unread")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(memberId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.hasUnread").value(true));
+        } finally {
+            jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", otherRoomId);
+            jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", otherRoomId);
+            jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", otherRoomId);
+        }
+
+        // 비멤버는 다른 room-scoped 엔드포인트와 동일하게 403.
+        mockMvc.perform(get("/api/v1/rooms/" + roomId + "/notifications/unread")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(outsiderId)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("ROOM_MEMBER_NOT_FOUND"));
+    }
+
     private String bearer(long userId) {
         return "Bearer " + jwtTokenProvider.createAccessToken(userId);
     }

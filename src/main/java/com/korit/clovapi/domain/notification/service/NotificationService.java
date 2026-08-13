@@ -96,8 +96,14 @@ public class NotificationService {
         notificationMapper.insertOne(roomId, recipientId, actorId, type, subType, referenceId, payload);
     }
 
-    /** 종 아이콘 배지(계약 §13, web-design-repository#89) — room 무관 유저 전체 기준. */
+    /** 종 아이콘 배지(계약 §13, web-design-repository#89) — room 무관 유저 전체 기준. 방 목록(홈)에서 쓴다. */
     public UnreadResponse getUnread(long recipientId) {
         return new UnreadResponse(notificationMapper.existsUnread(recipientId));
+    }
+
+    /** 방 안 종 아이콘 배지(계약 §13, clov-api#174) — 이 방만 기준. 방 안(Header variant=room)에서 쓴다. */
+    public UnreadResponse getUnreadInRoom(long roomId, long recipientId) {
+        assertActiveMember(roomId, recipientId);
+        return new UnreadResponse(notificationMapper.existsUnreadInRoom(recipientId, roomId));
     }
 }

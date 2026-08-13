@@ -59,4 +59,13 @@ public class NotificationController {
         Long requesterId = (Long) authentication.getPrincipal();
         return ApiResponse.success(notificationService.getUnread(requesterId));
     }
+
+    @GetMapping("/rooms/{roomId}/notifications/unread")
+    public ApiResponse<UnreadResponse> unreadInRoom(
+            @PathVariable Long roomId,
+            Authentication authentication
+    ) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        return ApiResponse.success(notificationService.getUnreadInRoom(roomId, requesterId));
+    }
 }
