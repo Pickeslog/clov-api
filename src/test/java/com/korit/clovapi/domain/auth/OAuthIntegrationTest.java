@@ -98,11 +98,82 @@ class OAuthIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.error.code").value("OAUTH_CODE_INVALID"));
     }
 
+    // web-design-repository#90 — provider는 다르지만 이메일이 같은 기존 계정이 있으면
+    // (B) 신규가 아니라 (C) linkCandidate로 응답하고, link-confirm으로 확인해야 로그인된다.
+    // 새 users row는 안 생기고 oauth_provider/oauth_subject는 최초 가입 값 그대로 남는다.
+    @Test
+    void linksToExistingAccountWhenEmailMatchesDifferentProvider() throws Exception {
+        // 카카오로 먼저 가입.
+        OAuthProfile kakaoProfile = new OAuthProfile("kakao", "kakao-" + UUID.randomUUID(), email, "Kakao Nick");
+        String kakaoCode = codeStore.issue(kakaoProfile);
+        MvcResult kakaoExchange = mockMvc.perform(post("/api/v1/auth/oauth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + kakaoCode + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.authenticated").value(false))
+                .andReturn();
+        String kakaoRegToken = JsonPath.read(kakaoExchange.getResponse().getContentAsString(), "$.data.registrationToken");
+        mockMvc.perform(post("/api/v1/auth/oauth/consent")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"registrationToken\":\"" + kakaoRegToken + "\","
+                                + "\"agreements\":{\"service\":true,\"privacy\":true,\"marketing\":false}}"))
+                .andExpect(status().isOk());
+
+        // 같은 이메일로 네이버 로그인 시도 → (B) 신규가 아니라 (C) linkCandidate.
+        OAuthProfile naverProfile = new OAuthProfile("naver", "naver-" + UUID.randomUUID(), email, "Naver Nick");
+        String naverCode = codeStore.issue(naverProfile);
+        MvcResult naverExchange = mockMvc.perform(post("/api/v1/auth/oauth/exchange")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + naverCode + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.authenticated").value(false))
+                .andExpect(jsonPath("$.data.linkCandidate").value(true))
+                .andExpect(jsonPath("$.data.maskedEmail").value(email.charAt(0) + "***" + email.substring(email.indexOf('@'))))
+                .andExpect(jsonPath("$.data.profile").doesNotExist())
+                .andReturn();
+        String linkToken = JsonPath.read(naverExchange.getResponse().getContentAsString(), "$.data.registrationToken");
+
+        // 연결 확인 → 기존(카카오) 계정으로 바로 로그인. 새 계정 생성 아님.
+        mockMvc.perform(post("/api/v1/auth/oauth/link-confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"registrationToken\":\"" + linkToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").isString())
+                .andExpect(jsonPath("$.data.user.email").value(email));
+
+        String provider = jdbcTemplate.queryForObject("SELECT oauth_provider FROM users WHERE email = ?", String.class, email);
+        assertTrue("kakao".equals(provider), "연결 후에도 최초 가입 provider(kakao)를 유지해야 한다: " + provider);
+        Long userCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Long.class, email);
+        assertTrue(userCount != null && userCount == 1L, "새 계정이 따로 생기면 안 된다");
+
+        // 재사용된 토큰 → 400(OAUTH_CODE_INVALID는 실제로 BAD_REQUEST로 매핑돼 있다,
+        // ErrorCode.java:52 — 위 exchange 재사용 케이스와 동일한 매핑).
+        mockMvc.perform(post("/api/v1/auth/oauth/link-confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"registrationToken\":\"" + linkToken + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("OAUTH_CODE_INVALID"));
+    }
+
     @Test
     void startsEachConfiguredOAuthProvider() throws Exception {
         for (String provider : new String[]{"kakao", "naver", "google"}) {
             mockMvc.perform(get("/oauth2/authorization/" + provider))
                     .andExpect(status().is3xxRedirection());
+        }
+    }
+
+    // #165 — 로그아웃 후 재로그인 시 제공자 세션을 그대로 타지 않고 재인증하도록
+    // prompt=login을 인가 요청에 얹는다. 동적 redirect_uri(#147) 로직과 안 깨지는지도 확인.
+    @Test
+    void addsLoginPromptToEveryAuthorizationRequest() throws Exception {
+        for (String provider : new String[]{"kakao", "naver", "google"}) {
+            MvcResult result = mockMvc.perform(get("/oauth2/authorization/" + provider))
+                    .andExpect(status().is3xxRedirection())
+                    .andReturn();
+            String location = result.getResponse().getHeader("Location");
+            assertTrue(location != null && location.contains("prompt=login"),
+                    provider + " 인가 요청에 prompt=login이 있어야 한다: " + location);
         }
     }
 

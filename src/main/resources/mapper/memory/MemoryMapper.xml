@@ -85,6 +85,10 @@
         UPDATE memories SET plan_id = #{planId} WHERE id = #{memoryId}
     </update>
 
+    <update id="detachAllByPlanId">
+        UPDATE memories SET plan_id = NULL WHERE plan_id = #{planId}
+    </update>
+
     <select id="findFeed" resultMap="memoryResultMap">
         SELECT m.id, m.room_id, m.plan_id, m.writer_id, u.nickname AS writer_nickname,
                u.profile_image_url AS writer_profile_image_url, m.title, m.content, m.memory_date,

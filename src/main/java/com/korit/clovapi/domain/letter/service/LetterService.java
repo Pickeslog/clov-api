@@ -8,6 +8,7 @@ import com.korit.clovapi.domain.letter.dto.LetterResponse;
 import com.korit.clovapi.domain.letter.dto.LetterSendRequest;
 import com.korit.clovapi.domain.letter.entity.LuckyLetter;
 import com.korit.clovapi.domain.letter.mapper.LetterMapper;
+import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.entity.RoomMember;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.global.exception.DomainException;
@@ -27,10 +28,13 @@ public class LetterService {
 
     private final LetterMapper letterMapper;
     private final RoomMemberMapper roomMemberMapper;
+    private final NotificationService notificationService;
 
-    public LetterService(LetterMapper letterMapper, RoomMemberMapper roomMemberMapper) {
+    public LetterService(LetterMapper letterMapper, RoomMemberMapper roomMemberMapper,
+                          NotificationService notificationService) {
         this.letterMapper = letterMapper;
         this.roomMemberMapper = roomMemberMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -56,6 +60,10 @@ public class LetterService {
                     .toList();
             if (!receiverIds.isEmpty()) {
                 letterMapper.insertBroadcast(roomId, senderId, receiverIds, title, request.content(), emoji, sentAt);
+                // #163 — receiverIds가 이미 "방 ACTIVE 멤버 · 발신자 제외"라 fanOut의 조건과
+                // 똑같다. referenceId는 여러 편지가 한 번에 생기므로 LEVEL_UP과 같이 null.
+                notificationService.fanOut(roomId, senderId, NotificationService.TYPE_FRIEND,
+                        NotificationService.SUB_LETTER_RECEIVE, null, null);
             }
             return new LetterBroadcastResponse(receiverIds.size());
         }
@@ -72,6 +80,10 @@ public class LetterService {
         letter.setEmoji(emoji);
         letter.setSentAt(sentAt);
         letterMapper.insert(letter);
+
+        // #163 — 편지 수신 알림. 수신자가 이미 확정된 1:1이라 단일 수신자(notifyOne).
+        notificationService.notifyOne(roomId, receiverId, senderId, NotificationService.TYPE_FRIEND,
+                NotificationService.SUB_LETTER_RECEIVE, letter.getId(), null);
 
         return LetterResponse.from(letterMapper.findDetailById(letter.getId(), senderId)
                 .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND)));

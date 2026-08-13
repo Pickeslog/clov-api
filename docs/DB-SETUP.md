@@ -37,6 +37,6 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE();
 ```
 
-The approved shared schema contains 19 tables. Mapper XML files belong under
+The approved shared schema contains 24 tables. Mapper XML files belong under
 `src/main/resources/mapper/`, and domain entities belong under
 `com.korit.clovapi.domain`.

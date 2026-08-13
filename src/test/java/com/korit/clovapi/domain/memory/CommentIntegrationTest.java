@@ -118,6 +118,44 @@ class CommentIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items.length()").value(0));
     }
 
+    // #161 — 댓글 작성 시 알림이 아예 없던 문제. 방 전체가 아니라 그 추억 작성자 1명에게만 간다.
+    @Test
+    void commentCreationNotifiesOnlyTheMemoryWriter() throws Exception {
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"너 진짜 웃겼어\"}"))
+                .andExpect(status().isCreated());
+
+        // sub_type='COMMENT'로 좁힌다 — setUp()의 추억 생성 자체가 이미 다른 멤버에게
+        // MEMORY_WRITE 알림을 하나 팬아웃해뒀으므로, 방 전체 COUNT로 세면 그것까지 잡힌다.
+        java.util.List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT recipient_id, actor_id, type, sub_type, reference_id FROM notifications "
+                        + "WHERE room_id = ? AND sub_type = 'COMMENT'",
+                roomId);
+        assert rows.size() == 1 : "댓글 하나에 COMMENT 알림도 정확히 하나여야 한다(방 전체 팬아웃이면 안 됨)";
+        java.util.Map<String, Object> row = rows.get(0);
+        assert ((Number) row.get("recipient_id")).longValue() == writerId : "수신자는 추억 작성자여야 한다";
+        assert ((Number) row.get("actor_id")).longValue() == otherId : "actor는 댓글 작성자여야 한다";
+        assert "FRIEND".equals(row.get("type"));
+        assert ((Number) row.get("reference_id")).longValue() == memoryId : "referenceId는 댓글이 아니라 memoryId여야 한다";
+    }
+
+    // 자기 추억에 자기가 단 댓글은 다른 이벤트들의 "actor 본인 제외" 관례와 같다.
+    @Test
+    void writerCommentingOnOwnMemoryDoesNotNotify() throws Exception {
+        mockMvc.perform(post("/api/v1/memories/{memoryId}/comments", memoryId)
+                        .header("Authorization", "Bearer " + writerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"셀프 코멘트\"}"))
+                .andExpect(status().isCreated());
+
+        // 위와 같은 이유로 COMMENT 알림만 좁혀서 0건인지 본다 — setUp()의 MEMORY_WRITE는 무관.
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notifications WHERE room_id = ? AND sub_type = 'COMMENT'", Long.class, roomId);
+        assert count != null && count == 0;
+    }
+
     @Test
     void nonMemberCannotListComments() throws Exception {
         MvcResult outsiderSignup = signup("comment-outsider-" + UUID.randomUUID() + "@example.test", "Outsider");

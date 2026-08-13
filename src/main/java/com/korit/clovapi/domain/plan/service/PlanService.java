@@ -8,6 +8,7 @@ import com.korit.clovapi.domain.plan.entity.PlanStagePhoto;
 import com.korit.clovapi.domain.plan.mapper.ChecklistMapper;
 import com.korit.clovapi.domain.plan.mapper.PlanMapper;
 import com.korit.clovapi.domain.plan.mapper.StagePhotoMapper;
+import com.korit.clovapi.domain.memory.mapper.MemoryMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
 import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.domain.room.service.ExpService;
@@ -48,18 +49,20 @@ public class PlanService {
     private final ChecklistMapper checklistMapper;
     private final StagePhotoMapper stagePhotoMapper;
     private final RoomMemberMapper roomMemberMapper;
+    private final MemoryMapper memoryMapper;
     private final StoragePresigner storagePresigner;
     private final ExpService expService;
     private final NotificationService notificationService;
 
     public PlanService(PlanMapper planMapper, ChecklistMapper checklistMapper,
                        StagePhotoMapper stagePhotoMapper, RoomMemberMapper roomMemberMapper,
-                       StoragePresigner storagePresigner, ExpService expService,
+                       MemoryMapper memoryMapper, StoragePresigner storagePresigner, ExpService expService,
                        NotificationService notificationService) {
         this.planMapper = planMapper;
         this.checklistMapper = checklistMapper;
         this.stagePhotoMapper = stagePhotoMapper;
         this.roomMemberMapper = roomMemberMapper;
+        this.memoryMapper = memoryMapper;
         this.storagePresigner = storagePresigner;
         this.expService = expService;
         this.notificationService = notificationService;
@@ -115,6 +118,10 @@ public class PlanService {
         // 예외로 트랜잭션이 롤백돼 자식 삭제도 되돌려진다.
         checklistMapper.deleteByPlanId(planId);
         stagePhotoMapper.deleteByPlanId(planId);
+        // memories도 plan_id FK(fk_memories_plan)를 물고 있다(clov-api#167). 추억은 소프트
+        // 삭제라 유저가 피드에서 지워도 row가 남아 있어 하드 삭제로는 안 지워지고, 지워서도
+        // 안 된다 — 게시글 자체는 살려두고 연결만 끊는다(plan_id → NULL = FREE MEMORY 전환).
+        memoryMapper.detachAllByPlanId(planId);
         if (planMapper.deleteByIdAndWriterId(planId, userId) != 1) {
             throw new DomainException(ErrorCode.NOT_WRITER);
         }

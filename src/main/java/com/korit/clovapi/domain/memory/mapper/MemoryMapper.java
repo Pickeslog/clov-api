@@ -45,6 +45,11 @@ public interface MemoryMapper {
     /** 약속 연결 변경/해제(clov-api#98) — planId는 null 허용(해제). */
     void updateMemoryPlanId(@Param("memoryId") long memoryId, @Param("planId") Long planId);
 
+    /** 약속 삭제 시 그 약속에 달린 모든 추억(소프트 삭제분 포함)의 연결을 끊는다(clov-api#167).
+     * deleted_at으로 거르지 않는다 — soft delete는 row를 안 지우므로, 삭제된 추억도 plan_id가
+     * 남아 있으면 plans FK(fk_memories_plan) 제약에 걸려 약속 삭제가 실패한다. */
+    void detachAllByPlanId(@Param("planId") long planId);
+
     List<Memory> findFeed(@Param("roomId") long roomId, @Param("month") String month,
                           @Param("writerId") Long writerId, @Param("tag") String tag,
                           @Param("participantUserId") Long participantUserId,

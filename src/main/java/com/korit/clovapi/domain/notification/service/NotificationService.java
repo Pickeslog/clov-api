@@ -3,6 +3,7 @@ package com.korit.clovapi.domain.notification.service;
 import com.korit.clovapi.domain.notification.dto.NotificationResponse;
 import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
 import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
+import com.korit.clovapi.domain.notification.dto.UnreadResponse;
 import com.korit.clovapi.domain.notification.entity.Notification;
 import com.korit.clovapi.domain.notification.mapper.NotificationMapper;
 import com.korit.clovapi.domain.room.mapper.RoomMemberMapper;
@@ -30,6 +31,8 @@ public class NotificationService {
     public static final String SUB_MEMBER_JOINED = "MEMBER_JOINED";
     public static final String SUB_JOIN_ACCEPTED = "JOIN_ACCEPTED";
     public static final String SUB_MEMBER_LEFT = "MEMBER_LEFT";
+    public static final String SUB_COMMENT = "COMMENT";
+    public static final String SUB_LETTER_RECEIVE = "LETTER_RECEIVE";
 
     private final NotificationMapper notificationMapper;
     private final RoomMemberMapper roomMemberMapper;
@@ -91,5 +94,16 @@ public class NotificationService {
     public void notifyOne(long roomId, long recipientId, Long actorId, String type, String subType,
                           Long referenceId, String payload) {
         notificationMapper.insertOne(roomId, recipientId, actorId, type, subType, referenceId, payload);
+    }
+
+    /** 종 아이콘 배지(계약 §13, web-design-repository#89) — room 무관 유저 전체 기준. 방 목록(홈)에서 쓴다. */
+    public UnreadResponse getUnread(long recipientId) {
+        return new UnreadResponse(notificationMapper.existsUnread(recipientId));
+    }
+
+    /** 방 안 종 아이콘 배지(계약 §13, clov-api#174) — 이 방만 기준. 방 안(Header variant=room)에서 쓴다. */
+    public UnreadResponse getUnreadInRoom(long roomId, long recipientId) {
+        assertActiveMember(roomId, recipientId);
+        return new UnreadResponse(notificationMapper.existsUnreadInRoom(recipientId, roomId));
     }
 }

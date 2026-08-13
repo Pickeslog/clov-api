@@ -2,6 +2,7 @@ package com.korit.clovapi.domain.notification.controller;
 
 import com.korit.clovapi.domain.notification.dto.NotificationsResponse;
 import com.korit.clovapi.domain.notification.dto.ReadAllResponse;
+import com.korit.clovapi.domain.notification.dto.UnreadResponse;
 import com.korit.clovapi.domain.notification.service.NotificationService;
 import com.korit.clovapi.global.response.ApiResponse;
 import org.springframework.security.core.Authentication;
@@ -51,5 +52,20 @@ public class NotificationController {
     ) {
         Long requesterId = (Long) authentication.getPrincipal();
         return ApiResponse.success(notificationService.markAllAsRead(roomId, requesterId));
+    }
+
+    @GetMapping("/users/me/notifications/unread")
+    public ApiResponse<UnreadResponse> unread(Authentication authentication) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        return ApiResponse.success(notificationService.getUnread(requesterId));
+    }
+
+    @GetMapping("/rooms/{roomId}/notifications/unread")
+    public ApiResponse<UnreadResponse> unreadInRoom(
+            @PathVariable Long roomId,
+            Authentication authentication
+    ) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        return ApiResponse.success(notificationService.getUnreadInRoom(roomId, requesterId));
     }
 }

@@ -5,6 +5,7 @@ import com.korit.clovapi.global.security.handler.JwtAccessDeniedHandler;
 import com.korit.clovapi.global.security.handler.JwtAuthenticationEntryPoint;
 import com.korit.clovapi.global.security.jwt.JwtProperties;
 import com.korit.clovapi.global.security.oauth2.CustomOAuth2UserService;
+import com.korit.clovapi.global.security.oauth2.LoginPromptAuthorizationRequestResolver;
 import com.korit.clovapi.global.security.oauth2.OAuth2FailureHandler;
 import com.korit.clovapi.global.security.oauth2.OAuth2SuccessHandler;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +40,8 @@ public class SecurityConfig {
             CustomOAuth2UserService customOAuth2UserService,
             OAuth2SuccessHandler oauth2SuccessHandler,
             OAuth2FailureHandler oauth2FailureHandler,
-            CorsConfigurationSource corsConfigurationSource
+            CorsConfigurationSource corsConfigurationSource,
+            LoginPromptAuthorizationRequestResolver loginPromptAuthorizationRequestResolver
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -57,6 +59,9 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        // 로그아웃 후 재로그인 시 재인증을 강제한다(prompt=login) — #165.
+                        .authorizationEndpoint(endpoint ->
+                                endpoint.authorizationRequestResolver(loginPromptAuthorizationRequestResolver))
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oauth2SuccessHandler)
                         .failureHandler(oauth2FailureHandler)

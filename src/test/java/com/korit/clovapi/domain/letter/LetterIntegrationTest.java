@@ -51,6 +51,7 @@ class LetterIntegrationTest extends IntegrationTestSupport {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM letter_favorites WHERE letter_id IN (SELECT id FROM lucky_letters WHERE room_id = ?)", roomId);
         jdbcTemplate.update("DELETE FROM lucky_letters WHERE room_id = ?", roomId);
+        jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", roomId);
         jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", roomId);
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?, ?)", senderId, receiverId, outsiderId);
@@ -72,6 +73,16 @@ class LetterIntegrationTest extends IntegrationTestSupport {
                 .andReturn();
 
         String letterId = JsonPath.read(sendResult.getResponse().getContentAsString(), "$.data.id");
+
+        // #163 — 편지 수신 알림. 수신자 1명에게만(팬아웃 아님), referenceId는 letterId.
+        java.util.Map<String, Object> notification = jdbcTemplate.queryForMap(
+                "SELECT recipient_id, actor_id, type, sub_type, reference_id FROM notifications WHERE room_id = ?",
+                roomId);
+        assert ((Number) notification.get("recipient_id")).longValue() == receiverId;
+        assert ((Number) notification.get("actor_id")).longValue() == senderId;
+        assert "FRIEND".equals(notification.get("type"));
+        assert "LETTER_RECEIVE".equals(notification.get("sub_type"));
+        assert String.valueOf(notification.get("reference_id")).equals(letterId);
 
         mockMvc.perform(get("/api/v1/rooms/" + roomId + "/letters?box=sent")
                         .header(HttpHeaders.AUTHORIZATION, bearer(senderId)))
@@ -171,6 +182,45 @@ class LetterIntegrationTest extends IntegrationTestSupport {
                         .header(HttpHeaders.AUTHORIZATION, bearer(receiverId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1));
+
+        // #163 — 브로드캐스트도 알림이 나가야 한다. 발신자는 제외, referenceId는 편지가
+        // 여러 건일 수 있어 null(LEVEL_UP과 같은 처리).
+        java.util.Map<String, Object> notification = jdbcTemplate.queryForMap(
+                "SELECT recipient_id, actor_id, type, sub_type, reference_id FROM notifications WHERE room_id = ?",
+                roomId);
+        assert ((Number) notification.get("recipient_id")).longValue() == receiverId;
+        assert ((Number) notification.get("actor_id")).longValue() == senderId;
+        assert "LETTER_RECEIVE".equals(notification.get("sub_type"));
+        assert notification.get("reference_id") == null;
+    }
+
+    // 활성 멤버가 발신자뿐이면 편지도 알림도 생성되면 안 된다(기존 receiverIds.isEmpty() 가드).
+    @Test
+    void broadcastWithNoOtherActiveMembersCreatesNeitherLetterNorNotification() throws Exception {
+        long soloRoomId = insertRoom();
+        long soloSenderId = insertUser("solo-sender");
+        insertMember(soloRoomId, soloSenderId);
+
+        try {
+            mockMvc.perform(post("/api/v1/rooms/" + soloRoomId + "/letters")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(soloSenderId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"broadcast\":true,\"content\":\"아무도 없네\"}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.data.sentCount").value(0));
+
+            Long letterCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM lucky_letters WHERE room_id = ?", Long.class, soloRoomId);
+            Long notificationCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM notifications WHERE room_id = ?", Long.class, soloRoomId);
+            assert letterCount != null && letterCount == 0;
+            assert notificationCount != null && notificationCount == 0;
+        } finally {
+            jdbcTemplate.update("DELETE FROM notifications WHERE room_id = ?", soloRoomId);
+            jdbcTemplate.update("DELETE FROM room_members WHERE room_id = ?", soloRoomId);
+            jdbcTemplate.update("DELETE FROM friendship_rooms WHERE id = ?", soloRoomId);
+            jdbcTemplate.update("DELETE FROM users WHERE id = ?", soloSenderId);
+        }
     }
 
     private String bearer(long userId) {

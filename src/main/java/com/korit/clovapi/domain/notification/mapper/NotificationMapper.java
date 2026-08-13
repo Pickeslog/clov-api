@@ -31,4 +31,11 @@ public interface NotificationMapper {
     void insertOne(@Param("roomId") long roomId, @Param("recipientId") long recipientId,
                    @Param("actorId") Long actorId, @Param("type") String type, @Param("subType") String subType,
                    @Param("referenceId") Long referenceId, @Param("payload") String payload);
+
+    // 종 아이콘 배지용(계약 §13, web-design-repository#89). room 무관, 유저 전체 기준 —
+    // idx_notifications_recipient(recipient_id, is_read, created_at)로 EXISTS만 확인한다.
+    boolean existsUnread(@Param("recipientId") long recipientId);
+
+    // 방 안 종 아이콘 배지용(계약 §13, clov-api#174). 위 existsUnread(전체)와 달리 이 방만 기준.
+    boolean existsUnreadInRoom(@Param("recipientId") long recipientId, @Param("roomId") long roomId);
 }
